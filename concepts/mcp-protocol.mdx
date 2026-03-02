@@ -1,0 +1,211 @@
+---
+title: Model Context Protocol
+description: Understanding the MCP protocol and how it enables communication between AI models and external tools
+---
+
+The **Model Context Protocol (MCP)** is a standardized protocol that enables AI models to interact with external tools, resources, and data sources. guMCP implements MCP servers that expose tools and resources to AI assistants through this protocol.
+
+## Protocol Overview
+
+MCP defines a client-server architecture where:
+
+- **MCP Clients**: AI assistants or applications that want to use external tools
+- **MCP Servers**: Services that expose tools, resources, and prompts to clients
+- **Transports**: Communication layers that connect clients and servers (stdio, SSE, HTTP)
+
+## Core Concepts
+
+### Tools
+
+Tools are functions that AI models can invoke to perform actions. Each tool has:
+
+- A unique name
+- A description of what it does
+- An input schema defining required and optional parameters
+- An implementation that executes the tool logic
+
+```python
+# Example from guMCP servers
+@server.list_tools()
+async def handle_list_tools() -> list[types.Tool]:
+    return [
+        types.Tool(
+            name="search_documents",
+            description="Search through documents with a query",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query"
+                    }
+                },
+                "required": ["query"]
+            }
+        )
+    ]
+```
+
+### Resources
+
+Resources represent data that can be accessed by the AI model. They provide context without requiring tool execution:
+
+- Documents
+- Database records
+- API responses
+- File contents
+
+Resources are read-only and can be listed or fetched by the client.
+
+### Prompts
+
+Prompts are pre-defined templates that help structure interactions with the AI model. They can include:
+
+- System instructions
+- User message templates
+- Context from resources
+- Tool usage examples
+
+## Server Initialization
+
+Every MCP server needs to provide initialization options that describe its capabilities:
+
+```python
+def get_initialization_options(server_instance):
+    """Return initialization options for the MCP server"""
+    return server_instance.create_initialization_options()
+```
+
+These options tell clients:
+- What protocol version is supported
+- What capabilities the server provides
+- Server metadata and configuration
+
+## Message Flow
+
+1. **Initialization**: Client connects and exchanges capability information
+2. **Discovery**: Client requests available tools, resources, and prompts
+3. **Invocation**: Client calls tools with parameters
+4. **Response**: Server executes tool and returns results
+5. **Resource Access**: Client fetches resource contents as needed
+
+<Note>
+MCP uses JSON-RPC 2.0 for message formatting, enabling structured request/response communication over various transports.
+</Note>
+
+## Server Implementation in guMCP
+
+guMCP servers follow a consistent pattern:
+
+### 1. Create the Server Instance
+
+```python
+import mcp.server
+import mcp.types as types
+
+server = mcp.server.Server("server-name")
+```
+
+### 2. Define Tool Handlers
+
+```python
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Handle tool execution requests"""
+    if name == "my_tool":
+        # Execute tool logic
+        result = await execute_tool(arguments)
+        return [types.TextContent(type="text", text=result)]
+    
+    raise ValueError(f"Unknown tool: {name}")
+```
+
+### 3. Define Resource Handlers
+
+```python
+@server.list_resources()
+async def handle_list_resources() -> list[types.Resource]:
+    """List available resources"""
+    return [
+        types.Resource(
+            uri="resource://my-resource",
+            name="My Resource",
+            description="A sample resource",
+            mimeType="text/plain"
+        )
+    ]
+
+@server.read_resource()
+async def handle_read_resource(uri: str) -> str:
+    """Read resource contents"""
+    # Fetch and return resource content
+    return "Resource content"
+```
+
+### 4. Run the Server
+
+Servers are launched using transport-specific runners:
+
+```python
+# For stdio transport
+import mcp.server.stdio
+
+async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+    await server.run(
+        read_stream,
+        write_stream,
+        initialization_options
+    )
+```
+
+See [Transports](/concepts/transports) for details on stdio and SSE transport implementations.
+
+## Session Management
+
+<Info>
+In guMCP, each user session can have its own server instance, maintaining separate state and credentials across connections.
+</Info>
+
+For remote (SSE) servers, guMCP creates and manages per-user server instances:
+
+```python
+# From src/servers/remote.py
+if session_key not in user_server_instances:
+    server_instance = server_factory(user_id, api_key)
+    user_server_instances[session_key] = server_instance
+else:
+    server_instance = user_server_instances[session_key]
+```
+
+This ensures:
+- User credentials are isolated
+- State persists across reconnections
+- Each user has independent tool execution context
+
+## Error Handling
+
+MCP servers should return structured errors when operations fail:
+
+```python
+try:
+    result = await perform_operation()
+    return [types.TextContent(type="text", text=str(result))]
+except Exception as e:
+    logger.error(f"Operation failed: {e}")
+    return [types.TextContent(
+        type="text",
+        text=f"Error: {str(e)}"
+    )]
+```
+
+<Tip>
+Always include descriptive error messages that help users understand what went wrong and how to fix it.
+</Tip>
+
+## Next Steps
+
+- Learn about [Transports](/concepts/transports) for connecting clients and servers
+- Understand [Authentication](/concepts/authentication) for secure access to services
+- Explore server implementations in the `src/servers/` directory

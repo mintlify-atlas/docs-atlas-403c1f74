@@ -1,0 +1,407 @@
+---
+title: 'Environment Setup'
+description: 'Configure environment variables and credentials for guMCP servers'
+---
+
+Proper environment configuration is essential for guMCP servers to function correctly. This guide covers all environment variables, credentials, and configuration options.
+
+## Configuration File
+
+### Creating Your Environment File
+
+<Steps>
+  <Step title="Copy the example file">
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+  
+  <Step title="Edit the configuration">
+    Open `.env` in your preferred text editor:
+    
+    ```bash
+    # Using VS Code
+    code .env
+    
+    # Using nano
+    nano .env
+    
+    # Using vim
+    vim .env
+    ```
+  </Step>
+  
+  <Step title="Configure required variables">
+    Update the values based on your needs and the servers you plan to use.
+  </Step>
+</Steps>
+
+## Core Environment Variables
+
+### Server Configuration
+
+These variables control the SSE server behavior:
+
+```bash
+# Host address for the SSE server (default: 0.0.0.0)
+GUMCP_HOST=0.0.0.0
+
+# Port for the SSE server (default: 8000)
+GUMCP_PORT=8000
+
+# Environment setting (local, development, production)
+ENVIRONMENT=local
+```
+
+### Anthropic Configuration
+
+```bash
+# Anthropic API key for Claude integration
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+## Server-Specific Variables
+
+Depending on which servers you plan to use, configure the appropriate variables:
+
+### Google Services (OAuth 2.0)
+
+For Google Sheets, Gmail, Google Docs, Google Drive, and Google Calendar:
+
+```bash
+# Path to Google OAuth credentials JSON file
+GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json
+
+# Path to store OAuth tokens
+GOOGLE_TOKEN_PATH=/path/to/token.json
+
+# Google Cloud Project ID
+GOOGLE_PROJECT_ID=your-project-id
+
+# OAuth Client ID and Secret
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+```
+
+#### Setting Up Google OAuth
+
+<Steps>
+  <Step title="Create a Google Cloud Project">
+    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create a new project or select an existing one
+    3. Note your project ID
+  </Step>
+  
+  <Step title="Enable APIs">
+    Enable the required Google APIs:
+    - Google Sheets API
+    - Gmail API
+    - Google Docs API
+    - Google Drive API
+    - Google Calendar API
+  </Step>
+  
+  <Step title="Configure OAuth Consent Screen">
+    1. Go to "APIs & Services" > "OAuth consent screen"
+    2. Choose "External" user type
+    3. Fill in application name and details
+    4. Add required scopes
+  </Step>
+  
+  <Step title="Create OAuth Credentials">
+    1. Go to "APIs & Services" > "Credentials"
+    2. Click "Create Credentials" > "OAuth client ID"
+    3. Choose "Desktop app" or "Web application"
+    4. Download the credentials JSON file
+    5. Save as `credentials.json` in your guMCP directory
+  </Step>
+</Steps>
+
+### Slack (OAuth 2.0)
+
+```bash
+# Slack OAuth credentials
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+SLACK_REDIRECT_URI=https://your-domain.com/oauth/callback
+
+# Slack Bot Token (for bot functionality)
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+```
+
+### Microsoft Outlook (OAuth 2.0)
+
+```bash
+# Azure AD / Microsoft OAuth credentials
+OUTLOOK_CLIENT_ID=your-azure-client-id
+OUTLOOK_CLIENT_SECRET=your-azure-client-secret
+OUTLOOK_TENANT_ID=your-tenant-id
+OUTLOOK_REDIRECT_URI=https://your-domain.com/oauth/callback
+```
+
+### Airtable (OAuth 2.0)
+
+```bash
+# Airtable OAuth credentials
+AIRTABLE_CLIENT_ID=your-airtable-client-id
+AIRTABLE_CLIENT_SECRET=your-airtable-client-secret
+AIRTABLE_REDIRECT_URI=https://your-domain.com/oauth/callback
+```
+
+### Linear (OAuth 2.0)
+
+```bash
+# Linear OAuth credentials
+LINEAR_CLIENT_ID=your-linear-client-id
+LINEAR_CLIENT_SECRET=your-linear-client-secret
+LINEAR_REDIRECT_URI=https://your-domain.com/oauth/callback
+```
+
+### Attio (Mixed Auth)
+
+```bash
+# Attio API key or OAuth credentials
+ATTIO_API_KEY=your-attio-api-key
+
+# For OAuth
+ATTIO_CLIENT_ID=your-attio-client-id
+ATTIO_CLIENT_SECRET=your-attio-client-secret
+```
+
+### Perplexity (API Key)
+
+```bash
+# Perplexity API key
+PERPLEXITY_API_KEY=pplx-your-api-key
+```
+
+## Environment File Structure
+
+### Complete Example
+
+Here's a complete `.env` file with all possible variables:
+
+```bash
+# Core Configuration
+ENVIRONMENT=local
+GUMCP_HOST=0.0.0.0
+GUMCP_PORT=8000
+
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Google Services
+GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json
+GOOGLE_TOKEN_PATH=/path/to/token.json
+GOOGLE_PROJECT_ID=your-project-id
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+
+# Slack
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+SLACK_REDIRECT_URI=https://your-domain.com/oauth/callback
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+
+# Microsoft Outlook
+OUTLOOK_CLIENT_ID=your-azure-client-id
+OUTLOOK_CLIENT_SECRET=your-azure-client-secret
+OUTLOOK_TENANT_ID=your-tenant-id
+OUTLOOK_REDIRECT_URI=https://your-domain.com/oauth/callback
+
+# Airtable
+AIRTABLE_CLIENT_ID=your-airtable-client-id
+AIRTABLE_CLIENT_SECRET=your-airtable-client-secret
+AIRTABLE_REDIRECT_URI=https://your-domain.com/oauth/callback
+
+# Linear
+LINEAR_CLIENT_ID=your-linear-client-id
+LINEAR_CLIENT_SECRET=your-linear-client-secret
+LINEAR_REDIRECT_URI=https://your-domain.com/oauth/callback
+
+# Attio
+ATTIO_API_KEY=your-attio-api-key
+ATTIO_CLIENT_ID=your-attio-client-id
+ATTIO_CLIENT_SECRET=your-attio-client-secret
+
+# Perplexity
+PERPLEXITY_API_KEY=pplx-your-api-key
+```
+
+## Loading Environment Variables
+
+### Automatic Loading
+
+The SSE development server automatically loads variables from `.env`:
+
+```bash
+./start_sse_dev_server.sh
+```
+
+The script uses:
+```bash
+export $(grep -v '^#' .env | xargs)
+```
+
+### Manual Loading
+
+For stdio servers or manual starts:
+
+```bash
+# Load environment variables
+source .env
+
+# Or use export
+export $(grep -v '^#' .env | xargs)
+
+# Then run the server
+python src/servers/local.py --server=gsheets
+```
+
+### Claude Desktop Configuration
+
+For Claude Desktop, pass environment variables in the config:
+
+```json
+{
+  "mcpServers": {
+    "gsheets": {
+      "command": "/path/to/venv/bin/python",
+      "args": ["/path/to/src/servers/local.py", "--server=gsheets"],
+      "env": {
+        "GOOGLE_CREDENTIALS_PATH": "/path/to/credentials.json",
+        "GOOGLE_TOKEN_PATH": "/path/to/token.json"
+      }
+    }
+  }
+}
+```
+
+## Security Best Practices
+
+<Warning>
+  Never commit your `.env` file to version control. The `.env` file contains sensitive credentials and should be kept secret.
+</Warning>
+
+### Protecting Your Credentials
+
+1. **Add .env to .gitignore**
+   ```bash
+   echo ".env" >> .gitignore
+   ```
+
+2. **Use restrictive file permissions**
+   ```bash
+   chmod 600 .env
+   ```
+
+3. **Rotate credentials regularly**
+   - Change API keys periodically
+   - Revoke unused tokens
+   - Monitor usage for suspicious activity
+
+4. **Use separate credentials for different environments**
+   - Development: `.env.development`
+   - Production: `.env.production`
+   - Testing: `.env.test`
+
+5. **Consider using a secrets manager**
+   - AWS Secrets Manager
+   - HashiCorp Vault
+   - Google Secret Manager
+   - Azure Key Vault
+
+## Environment-Specific Configuration
+
+### Development Environment
+
+```bash
+ENVIRONMENT=development
+GUMCP_HOST=localhost
+GUMCP_PORT=8000
+DEBUG=true
+LOG_LEVEL=DEBUG
+```
+
+### Production Environment
+
+```bash
+ENVIRONMENT=production
+GUMCP_HOST=0.0.0.0
+GUMCP_PORT=8000
+DEBUG=false
+LOG_LEVEL=INFO
+```
+
+## Verifying Configuration
+
+### Check Server Status
+
+Verify your SSE server configuration:
+
+```bash
+# Start the server
+./start_sse_dev_server.sh
+
+# Check health
+curl http://localhost:8000/health_check
+```
+
+Expected response:
+```json
+{
+  "status": "ok",
+  "servers": ["simple-tools-server", "gsheets", "gmail", ...]
+}
+```
+
+### Test Authentication
+
+For servers requiring authentication, test the connection:
+
+```bash
+# Test with the remote client
+python tests/clients/RemoteMCPTestClient.py --endpoint=http://localhost:8000/gsheets/local
+
+# Test with the local client
+python tests/clients/LocalMCPTestClient.py --server=gsheets
+```
+
+## Troubleshooting
+
+### Environment Variables Not Loading
+
+1. **Check file location**: Ensure `.env` is in the guMCP root directory
+2. **Verify file format**: No spaces around `=` signs
+3. **Check for comments**: Lines starting with `#` are ignored
+4. **Quote complex values**: Use quotes for values with spaces or special characters
+
+### Authentication Failures
+
+1. **Verify API keys**: Check that keys are valid and not expired
+2. **Check permissions**: Ensure OAuth apps have required scopes
+3. **Validate paths**: Verify credential file paths are correct and accessible
+4. **Review logs**: Check server logs for specific error messages
+
+### OAuth Redirect Issues
+
+For OAuth servers requiring HTTPS redirects:
+
+1. **Use a tunnel for local development**:
+   ```bash
+   # Using ngrok
+   ngrok http 8000
+   ```
+
+2. **Update redirect URI** in your OAuth app settings
+3. **Set the redirect URI in .env**:
+   ```bash
+   GOOGLE_REDIRECT_URI=https://your-ngrok-url.ngrok.io/oauth/callback
+   ```
+
+## Next Steps
+
+- [Local Stdio Deployment](/deployment/local-stdio) - Run servers locally
+- [Remote SSE Deployment](/deployment/remote-sse) - Run servers remotely
+- [Server Documentation](/servers/overview) - Learn about available servers
+- [Authentication Guide](/concepts/authentication) - Detailed OAuth setup

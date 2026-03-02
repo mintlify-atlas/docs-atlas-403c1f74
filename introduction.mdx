@@ -1,0 +1,136 @@
+---
+title: Introduction
+description: Open-source collection of Model Context Protocol servers with unified backend for local and remote deployment
+---
+
+<img
+  src="/images/gumcp-hero.png"
+  alt="guMCP - Unified Model Context Protocol Servers"
+/>
+
+## What is guMCP?
+
+guMCP (Gumloop Unified Model Context Protocol) is an open-source collection of MCP servers that can be run both remotely and locally. The project aims to create the largest collection of MCP servers with a unified backend architecture, fostering a community around AI integrations and the future of AGI.
+
+<Note>
+  While many MCP server providers are closed source, and open-source alternatives typically only support local hosting through stdio, guMCP provides a comprehensive solution for both deployment models.
+</Note>
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Dual transport support" icon="arrows-split-up-and-left">
+    Run servers locally via stdio or remotely via SSE (Server-Sent Events) transport
+  </Card>
+  <Card title="Unified backend" icon="layer-group">
+    Consistent architecture across all servers with shared authentication and initialization patterns
+  </Card>
+  <Card title="Flexible authentication" icon="key">
+    Pluggable auth system supporting OAuth 2.0, API keys, and custom implementations via `BaseAuthClient`
+  </Card>
+  <Card title="Growing collection" icon="boxes-stacked">
+    15+ production-ready servers including Google Workspace, Slack, Linear, Airtable, and more
+  </Card>
+</CardGroup>
+
+## Available servers
+
+guMCP provides integrations with popular productivity and development tools:
+
+### Google Workspace
+- **Google Sheets** - Create, read, and update spreadsheets
+- **Gmail** - Send emails and manage inbox
+- **Google Docs** - Create and edit documents
+- **Google Drive** - Manage files and folders
+- **Google Calendar** - Schedule and manage events
+
+### Communication & collaboration
+- **Slack** - Send messages, manage channels, and interact with workspaces
+- **Outlook** - Email and calendar management via Microsoft Graph API
+
+### Productivity tools
+- **Airtable** - Database operations and workflow automation
+- **Linear** - Issue tracking and project management
+- **Attio** - CRM operations and contact management
+- **Typeform** - Form management and response handling
+- **QuickBooks** - Financial data and accounting operations
+- **HubSpot** - Marketing and sales automation
+
+### Search & AI
+- **Perplexity** - AI-powered search and research
+
+<Warning>
+  OAuth-based servers require additional setup for local deployment. Remote deployment via Gumloop provides seamless authentication out of the box.
+</Warning>
+
+## Quick start
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Understand the unified backend structure and how servers are organized
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up your development environment and install dependencies
+  </Card>
+  <Card title="Local deployment" icon="computer" href="/deployment/local-stdio">
+    Run servers locally using stdio transport
+  </Card>
+  <Card title="Remote deployment" icon="cloud" href="/deployment/remote-sse">
+    Deploy servers with SSE transport for remote access
+  </Card>
+</CardGroup>
+
+## Authentication models
+
+guMCP supports two primary authentication approaches:
+
+### Local authentication
+For local development and self-hosted deployments, the `LocalAuthClient` stores credentials and OAuth configurations in local files:
+- OAuth configs: `local_auth/oauth_configs/<service_name>/oauth.json`
+- User credentials: `local_auth/credentials/<service_name>/<user_id>_credentials.json`
+
+### Remote authentication
+For hosted deployments, implement a custom `BaseAuthClient` that integrates with your authentication infrastructure. The `GumloopAuthClient` provides a reference implementation for remote credential management.
+
+<Tip>
+  The factory pattern in `src/auth/factory.py:12-39` automatically selects the appropriate auth client based on the `ENVIRONMENT` variable.
+</Tip>
+
+## Design philosophy
+
+guMCP is built on three core principles:
+
+1. **Unified architecture** - Every server follows the same patterns for initialization, tool registration, and credential management
+2. **Transport flexibility** - Servers work seamlessly with both stdio and SSE transports without modification
+3. **Open ecosystem** - Fully open-source to encourage community contributions and transparency
+
+## Community & support
+
+<CardGroup cols={3}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/gumloop/guMCP/issues">
+    Report bugs and request features
+  </Card>
+  <Card title="Forum" icon="comments" href="https://forum.gumloop.com">
+    Ask questions and share ideas
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/contributing">
+    Learn how to contribute new servers
+  </Card>
+</CardGroup>
+
+## Security & compliance
+
+Security is our highest priority. Gumloop is SOC 2 Type II, GDPR, and HIPAA compliant. We actively reward responsible disclosure of security vulnerabilities to security@gumloop.com.
+
+<Note>
+  guMCP is licensed under GNU General Public License v3.0 (GPL-3.0). By contributing, you agree your contributions will be licensed under the same terms.
+</Note>
+
+## Next steps
+
+Ready to get started? Here's what to do next:
+
+1. **Understand the architecture** - Read the [architecture overview](/architecture) to learn how guMCP is structured
+2. **Install guMCP** - Follow the [installation guide](/installation) to set up your development environment
+3. **Run your first server** - Try the [local deployment guide](/deployment/local-stdio) to run the simple-tools-server
+4. **Explore integrations** - Check out server-specific documentation for the services you want to integrate

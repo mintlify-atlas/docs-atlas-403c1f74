@@ -1,0 +1,215 @@
+---
+title: 'Local Stdio Deployment'
+description: 'Run guMCP servers locally using stdio transport'
+---
+
+Stdio (standard input/output) transport allows you to run MCP servers locally on your machine. This is the recommended method for desktop applications like Claude Desktop.
+
+## Overview
+
+When running in stdio mode:
+- Each server runs as a separate process
+- Communication happens through stdin/stdout
+- Suitable for single-user, local environments
+- Works with Claude Desktop, Cline, and other local MCP clients
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Python 3.11">
+    Ensure you have Python 3.11 or higher installed on your system.
+  </Step>
+  
+  <Step title="Clone and setup the repository">
+    ```bash
+    git clone https://github.com/gumloop/guMCP.git
+    cd guMCP
+    ```
+  </Step>
+  
+  <Step title="Create virtual environment">
+    ```bash
+    # Create the virtual environment
+    python -m venv venv
+    
+    # Activate it (choose the appropriate command for your OS)
+    # On Unix/macOS:
+    source venv/bin/activate
+    
+    # On Windows (Command Prompt):
+    venv\Scripts\activate
+    
+    # On Windows (PowerShell):
+    .\venv\Scripts\Activate.ps1
+    
+    # On Windows (Git Bash):
+    source venv/Scripts/activate
+    ```
+  </Step>
+  
+  <Step title="Install dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  
+  <Step title="Configure environment variables">
+    ```bash
+    cp .env.example .env
+    # Edit .env with your API keys and configuration
+    ```
+    
+    See [Environment Setup](/deployment/environment-setup) for details on configuration.
+  </Step>
+</Steps>
+
+## Running a Server
+
+### Basic Usage
+
+To start a stdio server, use the following command:
+
+```bash
+python src/servers/local.py --server=<server-name>
+```
+
+### Example: Simple Tools Server
+
+```bash
+python src/servers/local.py --server=simple-tools-server
+```
+
+### Example: Google Sheets Server
+
+```bash
+python src/servers/local.py --server=gsheets
+```
+
+### With User ID
+
+You can optionally specify a user ID for server context:
+
+```bash
+python src/servers/local.py --server=simple-tools-server --user-id=myuser
+```
+
+## Available Servers
+
+The server automatically discovers available servers from the `src/servers/` directory. Each server must have a `main.py` file with:
+- A `server` object (server factory)
+- A `get_initialization_options` function
+
+To see available servers, try running with an invalid server name:
+
+```bash
+python src/servers/local.py --server=invalid
+```
+
+This will output a list of all available servers.
+
+## Testing with the Local MCP Client
+
+For convenience, guMCP provides a lightweight test client to connect to stdio servers:
+
+```bash
+python tests/clients/LocalMCPTestClient.py --server=simple-tools-server
+```
+
+This client:
+- Starts the server automatically
+- Connects via stdio
+- Provides an interactive testing interface
+- Useful for development and debugging
+
+## Configuration for Claude Desktop
+
+To use a guMCP server with Claude Desktop, add the server configuration to your Claude Desktop config file.
+
+### macOS/Linux
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "gsheets": {
+      "command": "/path/to/guMCP/venv/bin/python",
+      "args": [
+        "/path/to/guMCP/src/servers/local.py",
+        "--server=gsheets"
+      ],
+      "env": {
+        "GOOGLE_CREDENTIALS_PATH": "/path/to/credentials.json"
+      }
+    }
+  }
+}
+```
+
+### Windows
+
+Edit `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "gsheets": {
+      "command": "C:\\path\\to\\guMCP\\venv\\Scripts\\python.exe",
+      "args": [
+        "C:\\path\\to\\guMCP\\src\\servers\\local.py",
+        "--server=gsheets"
+      ],
+      "env": {
+        "GOOGLE_CREDENTIALS_PATH": "C:\\path\\to\\credentials.json"
+      }
+    }
+  }
+}
+```
+
+## How It Works
+
+The stdio server (`src/servers/local.py`):
+
+1. **Loads the specified server module** from `src/servers/<server-name>/main.py`
+2. **Validates required attributes** (`server` and `get_initialization_options`)
+3. **Creates a server instance** with the optional user ID
+4. **Starts the stdio transport** using `mcp.server.stdio.stdio_server()`
+5. **Runs the server** with the read/write streams
+
+### Key Features
+
+- **Dynamic server loading**: Servers are loaded dynamically by name
+- **User context**: Optional `--user-id` parameter for multi-user scenarios
+- **Error handling**: Provides helpful error messages and lists available servers
+- **Logging**: Comprehensive logging for debugging
+
+## Troubleshooting
+
+### Server Not Found
+
+If you get a "Server not found" error:
+1. Check that the server directory exists in `src/servers/`
+2. Verify the directory contains a `main.py` file
+3. Run with an invalid server name to see the list of available servers
+
+### Import Errors
+
+If you encounter import errors:
+1. Ensure your virtual environment is activated
+2. Verify all dependencies are installed: `pip install -r requirements.txt`
+3. Check that you're running from the guMCP root directory
+
+### Authentication Errors
+
+For servers requiring authentication:
+1. Verify your `.env` file is configured correctly
+2. Check that API keys and credentials are valid
+3. For OAuth servers, ensure credentials files are in the correct location
+4. See [Environment Setup](/deployment/environment-setup) for configuration details
+
+## Next Steps
+
+- [Remote SSE Deployment](/deployment/remote-sse) - Run servers remotely
+- [Environment Setup](/deployment/environment-setup) - Configure environment variables
+- [Server Documentation](/servers/overview) - Learn about available servers

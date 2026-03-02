@@ -1,0 +1,241 @@
+---
+title: Perplexity
+description: Search the web and chat with Perplexity AI
+---
+
+The Perplexity server provides access to Perplexity AI's search and chat capabilities, enabling web searches with recency filters and conversations with various Perplexity models.
+
+## Authentication
+
+This server uses API key authentication.
+
+### Setup
+
+1. Obtain a Perplexity API key from [Perplexity AI](https://www.perplexity.ai/)
+2. Run the authentication setup:
+
+```bash
+python src/servers/perplexity/main.py auth
+```
+
+3. Enter your API key when prompted
+
+The API key is stored securely in your local authentication configuration.
+
+## Models
+
+The server supports these Perplexity models:
+
+| Model | Description |
+|-------|-------------|
+| `sonar` | Standard search model (default) |
+| `sonar-pro` | Enhanced search with better accuracy |
+| `sonar-deep-research` | In-depth research mode |
+| `sonar-reasoning` | Reasoning-focused responses |
+| `sonar-reasoning-pro` | Advanced reasoning capabilities |
+
+## Prompts
+
+The server provides pre-configured prompts for common use cases.
+
+<Accordion title="search_with_recency">
+Search with time-based filtering.
+
+**Arguments:**
+- `query` (required): The search query
+- `recency` (optional): Time filter - hour, day, week, month, year, or none
+
+**Example Usage:**
+```
+Query: "latest AI developments"
+Recency: week
+```
+
+Generates a prompt optimized for time-filtered web searches.
+</Accordion>
+
+<Accordion title="code_assistant">
+Get coding help from Perplexity.
+
+**Arguments:**
+- `problem` (required): The coding problem or question
+- `language` (optional): Programming language
+
+**Example Usage:**
+```
+Problem: "How to implement binary search"
+Language: Python
+```
+
+Generates a prompt optimized for code-related queries.
+</Accordion>
+
+## Tools
+
+<Accordion title="search">
+Search the web using Perplexity's API with optional filters.
+
+**Parameters:**
+- `query` (string, required): The search query
+- `model` (string, optional): Model to use (default: sonar)
+- `recency_filter` (string, optional): Time filter - hour, day, week, month, year
+- `return_related` (boolean, optional): Include related questions
+
+**Example:**
+```json
+{
+  "query": "best practices for API design",
+  "model": "sonar-pro",
+  "recency_filter": "month",
+  "return_related": true
+}
+```
+
+**Search Context:**
+The search uses high search context size for comprehensive results.
+
+**Response Format:**
+- Main answer content
+- Related questions (if requested)
+
+**Related Questions Example:**
+```
+**Related Questions:**
+- What are RESTful API design principles?
+- How to version APIs effectively?
+- What is GraphQL and when to use it?
+```
+</Accordion>
+
+<Accordion title="chat">
+Send a message to a Perplexity model without forcing web search.
+
+**Parameters:**
+- `message` (string, required): The message to send
+- `model` (string, optional): Model to use (default: sonar)
+- `system_prompt` (string, optional): Custom system prompt (default: "Be helpful, concise, and precise.")
+- `temperature` (number, optional): Randomness of responses, 0-2 (default: 0.7)
+
+**Example:**
+```json
+{
+  "message": "Explain how neural networks work",
+  "model": "sonar-reasoning",
+  "system_prompt": "You are an expert AI educator. Explain concepts clearly with examples.",
+  "temperature": 0.5
+}
+```
+
+**Search Context:**
+Uses medium search context size for balanced performance.
+
+**Temperature Guide:**
+- `0.0-0.3`: More focused and deterministic
+- `0.4-0.7`: Balanced creativity and consistency
+- `0.8-2.0`: More creative and varied responses
+</Accordion>
+
+## Recency Filters
+
+Time-based filtering for search results:
+
+| Filter | Description |
+|--------|-------------|
+| `hour` | Results from the past hour |
+| `day` | Results from the past 24 hours |
+| `week` | Results from the past 7 days |
+| `month` | Results from the past 30 days |
+| `year` | Results from the past year |
+| `none` | No time filtering (default) |
+
+## API Reference
+
+Base URL: `https://api.perplexity.ai`
+
+### Key Endpoint
+
+**POST /chat/completions**
+
+Request format:
+```json
+{
+  "model": "sonar",
+  "messages": [
+    {"role": "system", "content": "System prompt"},
+    {"role": "user", "content": "User message"}
+  ],
+  "temperature": 0.7,
+  "return_related_questions": false,
+  "web_search_options": {
+    "search_context_size": "high"
+  },
+  "search_recency_filter": "week"
+}
+```
+
+Response format:
+```json
+{
+  "choices": [
+    {
+      "message": {
+        "content": "Response text"
+      }
+    }
+  ],
+  "related_questions": ["Question 1", "Question 2"]
+}
+```
+
+## Features
+
+### Web Search
+
+- Configurable search context size (medium/high)
+- Time-based filtering for recent information
+- Related questions for exploration
+- Model selection for different use cases
+
+### Chat
+
+- Flexible system prompts
+- Temperature control for response variety
+- Multiple specialized models
+- Medium search context for background information
+
+## Error Handling
+
+The server handles:
+- Missing API key errors
+- Invalid model names (validates against supported models)
+- API rate limits and timeouts (60 second timeout)
+- HTTP error responses with status codes
+- Network failures
+
+Errors are returned with descriptive messages including:
+- Status codes from Perplexity API
+- Error text from responses
+- Exception details for debugging
+
+## Best Practices
+
+1. **Model Selection:**
+   - Use `sonar` for general searches
+   - Use `sonar-pro` for higher accuracy needs
+   - Use `sonar-deep-research` for comprehensive research
+   - Use reasoning models for complex problem-solving
+
+2. **Recency Filters:**
+   - Apply time filters for news and current events
+   - Use `none` for timeless topics
+   - Consider `week` or `month` as balanced defaults
+
+3. **Temperature:**
+   - Lower (0.0-0.3) for factual, consistent responses
+   - Medium (0.4-0.7) for balanced output
+   - Higher (0.8-2.0) for creative tasks
+
+4. **Related Questions:**
+   - Enable for exploratory research
+   - Use to discover related topics
+   - Helpful for user guidance

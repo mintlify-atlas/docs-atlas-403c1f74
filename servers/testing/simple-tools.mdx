@@ -1,0 +1,245 @@
+---
+title: Simple Tools
+description: Simple test server for key-value data storage
+---
+
+The Simple Tools server is a lightweight testing server that provides basic key-value storage functionality. It's designed for testing MCP server implementations and demonstrating multi-user data isolation.
+
+## Overview
+
+This server demonstrates:
+- Basic tool implementation patterns
+- User-specific data isolation
+- Stateful server operations
+- Simple CRUD operations
+
+## Authentication
+
+No authentication required. The server uses user IDs for data isolation.
+
+## User Data Isolation
+
+Each user has an isolated data store:
+- Data stores are created automatically per user ID
+- Users cannot access other users' data
+- Data persists for the lifetime of the server process
+
+## Tools
+
+<Accordion title="store-data">
+Store a key-value pair in the server.
+
+**Parameters:**
+- `key` (string, required): The storage key
+- `value` (string, required): The value to store
+
+**Example:**
+```json
+{
+  "key": "user_preference",
+  "value": "dark_mode"
+}
+```
+
+**Response:**
+```
+Stored 'user_preference' with value: dark_mode
+```
+
+**Notes:**
+- Overwrites existing values with the same key
+- Data is stored in-memory per user ID
+- No persistence across server restarts
+</Accordion>
+
+<Accordion title="retrieve-data">
+Retrieve a value by its key.
+
+**Parameters:**
+- `key` (string, required): The storage key to retrieve
+
+**Example:**
+```json
+{
+  "key": "user_preference"
+}
+```
+
+**Response (if found):**
+```
+Value for 'user_preference': dark_mode
+```
+
+**Response (if not found):**
+```
+Key 'user_preference' not found
+```
+</Accordion>
+
+<Accordion title="list-data">
+List all stored key-value pairs for the current user.
+
+**Parameters:** None
+
+**Example Response (with data):**
+```
+Stored data:
+- user_preference: dark_mode
+- language: en-US
+- timezone: America/New_York
+```
+
+**Example Response (empty):**
+```
+No data stored
+```
+</Accordion>
+
+## Data Structure
+
+The server maintains a simple in-memory structure:
+
+```python
+user_data_stores = {
+    "user_1": {
+        "key1": "value1",
+        "key2": "value2"
+    },
+    "user_2": {
+        "key1": "different_value"
+    }
+}
+```
+
+## Usage Examples
+
+### Basic Storage Workflow
+
+1. **Store data:**
+```json
+{
+  "tool": "store-data",
+  "arguments": {
+    "key": "api_token",
+    "value": "abc123"
+  }
+}
+```
+
+2. **Retrieve data:**
+```json
+{
+  "tool": "retrieve-data",
+  "arguments": {
+    "key": "api_token"
+  }
+}
+```
+
+3. **List all data:**
+```json
+{
+  "tool": "list-data",
+  "arguments": {}
+}
+```
+
+### Multi-User Example
+
+**User A** stores:
+```json
+{"key": "setting", "value": "option_a"}
+```
+
+**User B** stores:
+```json
+{"key": "setting", "value": "option_b"}
+```
+
+Each user retrieves their own value - data is completely isolated.
+
+## Server Implementation
+
+The server is implemented in `src/servers/simple-tools-server/main.py`:
+
+### Key Components
+
+- **Server Name:** `simple-tools-server`
+- **Version:** 1.0.0
+- **Data Storage:** In-memory dictionary per user
+- **Tool Count:** 3 tools
+
+### Initialization
+
+```python
+def create_server(user_id=None, api_key=None):
+    server = Server("simple-tools-server")
+    
+    if user_id:
+        server.user_id = user_id
+        if user_id not in user_data_stores:
+            user_data_stores[user_id] = {}
+    
+    return server
+```
+
+## Testing
+
+This server is ideal for:
+
+1. **MCP Protocol Testing:**
+   - Verify tool listing
+   - Test tool execution
+   - Validate error handling
+
+2. **Multi-User Testing:**
+   - Confirm data isolation
+   - Test concurrent access
+   - Verify user context handling
+
+3. **Integration Testing:**
+   - Simple server setup
+   - No external dependencies
+   - Predictable behavior
+
+## Limitations
+
+- **No Persistence:** Data is lost when server stops
+- **In-Memory Only:** Not suitable for large datasets
+- **String Values Only:** All values stored as strings
+- **No Authentication:** User ID is trusted from context
+- **No Data Expiration:** Data persists indefinitely during runtime
+
+## Error Handling
+
+The server validates:
+- Missing arguments (raises `ValueError`)
+- Missing required fields (raises `ValueError`)
+- Unknown tools (raises `ValueError`)
+
+All errors are returned as text content with descriptive messages.
+
+## Use Cases
+
+1. **Testing MCP Clients:**
+   - Verify client tool calling
+   - Test error handling
+   - Validate response parsing
+
+2. **Development:**
+   - Quick server setup for prototyping
+   - Learning MCP protocol
+   - Testing server features
+
+3. **Demonstration:**
+   - Show stateful operations
+   - Illustrate user isolation
+   - Example of CRUD operations
+
+## Best Practices
+
+1. **Use unique keys** to avoid accidental overwrites
+2. **List data regularly** to verify storage state
+3. **Clear understanding** that data is not persistent
+4. **Test multi-user scenarios** to verify isolation
+5. **Handle "not found" cases** in client applications

@@ -1,0 +1,231 @@
+---
+title: 'Gmail Server'
+description: 'Search, read, and send emails through Gmail'
+icon: 'envelope'
+---
+
+## Overview
+
+The Gmail server enables AI agents to interact with Gmail emails. It provides tools for searching, reading, and sending emails, as well as managing email labels.
+
+## Prerequisites
+
+- Python 3.11+
+- A Google Cloud Project with Gmail API enabled
+- OAuth 2.0 credentials with the scope: `https://www.googleapis.com/auth/gmail.modify`
+
+## Authentication
+
+### Setup OAuth Credentials
+
+1. [Create a new Google Cloud project](https://console.cloud.google.com/projectcreate)
+2. [Enable the Gmail API](https://console.cloud.google.com/workspace-api/products)
+3. [Configure an OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+4. Add OAuth scope: `https://www.googleapis.com/auth/gmail.modify`
+5. [Create an OAuth Client ID](https://console.cloud.google.com/apis/credentials/oauthclient) for "Desktop App"
+6. Download the credentials JSON and save as `local_auth/oauth_configs/gmail/oauth.json`
+
+### Authenticate
+
+```bash
+python src/servers/gmail/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="read_emails" icon="envelope-open">
+    **Description**: Search and read emails in Gmail
+    
+    **Parameters**:
+    - `query` (string, required): Gmail search query (e.g., "from:someone@example.com" or "subject:important")
+    - `max_results` (integer, optional): Maximum number of emails to return (default: 10)
+    
+    **Example**:
+    ```json
+    {
+      "query": "from:john@example.com is:unread",
+      "max_results": 20
+    }
+    ```
+    
+    **Returns**: List of matching emails with metadata (subject, sender, date, status, labels)
+  </Accordion>
+
+  <Accordion title="send_email" icon="paper-plane">
+    **Description**: Send an email through Gmail
+    
+    **Parameters**:
+    - `to` (string, required): Recipient email address
+    - `subject` (string, required): Email subject
+    - `body` (string, required): Email body (plain text)
+    - `cc` (string, optional): CC recipients (comma separated)
+    - `bcc` (string, optional): BCC recipients (comma separated)
+    
+    **Example**:
+    ```json
+    {
+      "to": "jane@example.com",
+      "subject": "Project Update",
+      "body": "Hi Jane,\n\nHere's the latest update on the project...",
+      "cc": "team@example.com"
+    }
+    ```
+    
+    **Returns**: Confirmation with message ID
+  </Accordion>
+
+  <Accordion title="update_email" icon="tag">
+    **Description**: Update email labels (mark as read/unread, move to folders)
+    
+    **Parameters**:
+    - `email_id` (string, required): The email ID to modify
+    - `add_labels` (array, optional): Labels to add (e.g., ["INBOX", "STARRED", "IMPORTANT"])
+    - `remove_labels` (array, optional): Labels to remove (e.g., ["UNREAD"])
+    
+    **Example**:
+    ```json
+    {
+      "email_id": "18c2f4d5e8a9b123",
+      "add_labels": ["STARRED"],
+      "remove_labels": ["UNREAD"]
+    }
+    ```
+    
+    **Returns**: Confirmation with updated label list
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Gmail server provides access to email resources:
+
+### List Resources
+
+Lists recent unread emails from your inbox (up to 10 at a time).
+
+**URI Format**: `gmail:///{message_id}`
+
+### Read Resource
+
+Reads the full content of a specific email, including:
+- Headers (From, To, Date, Subject)
+- Email body (plain text)
+- Metadata
+
+## Usage Examples
+
+### Searching Emails
+
+```python
+# Find all unread emails from a specific sender
+emails = await call_tool("read_emails", {
+    "query": "from:notifications@github.com is:unread",
+    "max_results": 50
+})
+
+# Search by subject and date
+emails = await call_tool("read_emails", {
+    "query": "subject:invoice after:2024/01/01"
+})
+
+# Find emails with attachments
+emails = await call_tool("read_emails", {
+    "query": "has:attachment"
+})
+```
+
+### Sending Emails
+
+```python
+# Send a simple email
+await call_tool("send_email", {
+    "to": "team@example.com",
+    "subject": "Weekly Report",
+    "body": "Here's this week's progress report..."
+})
+
+# Send with CC and BCC
+await call_tool("send_email", {
+    "to": "client@example.com",
+    "subject": "Proposal",
+    "body": "Please find our proposal attached...",
+    "cc": "manager@example.com",
+    "bcc": "archive@example.com"
+})
+```
+
+### Managing Email Labels
+
+```python
+# Mark email as read and star it
+await call_tool("update_email", {
+    "email_id": "18c2f4d5e8a9b123",
+    "add_labels": ["STARRED"],
+    "remove_labels": ["UNREAD"]
+})
+
+# Archive an email (remove from inbox)
+await call_tool("update_email", {
+    "email_id": "18c2f4d5e8a9b123",
+    "remove_labels": ["INBOX"]
+})
+```
+
+## Gmail Search Syntax
+
+The `query` parameter supports Gmail's powerful search operators:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `from:` | Sender | `from:john@example.com` |
+| `to:` | Recipient | `to:jane@example.com` |
+| `subject:` | Subject line | `subject:invoice` |
+| `is:unread` | Unread emails | `is:unread` |
+| `is:read` | Read emails | `is:read` |
+| `has:attachment` | Has attachments | `has:attachment` |
+| `after:` | Date range | `after:2024/01/01` |
+| `before:` | Date range | `before:2024/12/31` |
+| `label:` | Has label | `label:important` |
+| `-` | Exclude | `-from:spam@example.com` |
+
+## Gmail Labels
+
+Common Gmail labels you can use with `update_email`:
+
+- `INBOX` - Inbox
+- `UNREAD` - Unread
+- `STARRED` - Starred
+- `IMPORTANT` - Important
+- `SENT` - Sent
+- `DRAFT` - Draft
+- `SPAM` - Spam
+- `TRASH` - Trash
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server gmail --user-id local
+```
+
+## Best Practices
+
+1. **Use specific queries**: Narrow searches with operators to reduce results
+2. **Respect rate limits**: Gmail API has quotas - be mindful of bulk operations
+3. **Email IDs**: Store email IDs returned from searches for later operations
+4. **Plain text**: Currently only plain text email bodies are supported
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `read_emails` | Search emails | Find specific messages, monitor inbox |
+| `send_email` | Send emails | Automated responses, notifications |
+| `update_email` | Manage labels | Mark as read, archive, star |
+
+## Related Resources
+
+- [Gmail API Documentation](https://developers.google.com/gmail/api)
+- [Gmail Search Operators](https://support.google.com/mail/answer/7190)

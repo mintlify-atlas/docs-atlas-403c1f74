@@ -1,0 +1,198 @@
+---
+title: Typeform
+description: Retrieve Typeform forms and responses
+---
+
+The Typeform server enables you to access workspaces, forms, and form responses from your Typeform account through the MCP protocol.
+
+## Authentication
+
+This server uses OAuth 2.0 authentication with the following scopes:
+
+- `forms:read` - Read access to forms
+- `responses:read` - Read access to responses
+- `workspaces:read` - Read access to workspaces
+
+### Setup
+
+1. Follow the [Typeform OAuth authentication guide](https://www.typeform.com/developers/get-started/applications/)
+2. Select the required scopes listed above
+3. Copy your generated personal access token
+4. Create `local_auth/oauth_configs/typeform/oauth.json`:
+
+```json
+{
+  "client_id": "xxxxxxxxxxxxxxxxxxxxx",
+  "client_secret": "xxxxxxxxxxxxxxxxxxxxx",
+  "redirect_uri": "xxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+5. Run authentication:
+
+```bash
+python src/servers/typeform/main.py auth
+```
+
+## Resources
+
+The server exposes these resources:
+
+| URI | Description |
+|-----|-------------|
+| `typeform:///workspace/{workspace_id}` | Workspace details and associated forms |
+| `typeform:///form/{form_id}` | Form details with response summary |
+
+Resources include pagination support (10 items per page for forms).
+
+## Tools
+
+<Accordion title="list_workspaces">
+List all workspaces in your Typeform account.
+
+**Parameters:** None
+
+**Returns:**
+- Workspace name
+- Workspace ID
+- Default status (Yes/No)
+- Shared status (Yes/No)
+
+**Example Response:**
+```
+Found 2 workspaces:
+
+Name: Marketing Team
+  ID: wrk_abc123
+  Default: No
+  Shared: Yes
+
+Name: Personal Forms
+  ID: wrk_def456
+  Default: Yes
+  Shared: No
+```
+</Accordion>
+
+<Accordion title="list_forms_by_workspace">
+List all forms in a specific workspace.
+
+**Parameters:**
+- `workspace_id` (string, required): ID of the workspace
+
+**Example:**
+```json
+{
+  "workspace_id": "wrk_abc123"
+}
+```
+
+**Returns:**
+- Form title
+- Form ID
+- Creation date
+- Display URL
+
+Shows up to 50 forms per workspace.
+</Accordion>
+
+<Accordion title="search_forms">
+Search for forms by title.
+
+**Parameters:**
+- `query` (string, required): Search query to match form titles
+- `workspace_id` (string, optional): Filter by workspace ID
+
+**Example:**
+```json
+{
+  "query": "customer feedback",
+  "workspace_id": "wrk_abc123"
+}
+```
+
+**Implementation:** Client-side filtering using case-insensitive substring matching on form titles.
+
+**Returns:**
+- Form title
+- Form ID
+- Workspace name and ID
+- Created and last updated dates
+- Display URL
+</Accordion>
+
+<Accordion title="get_form_responses">
+Retrieve responses for a specific form.
+
+**Parameters:**
+- `form_id` (string, required): ID of the form
+- `limit` (integer, optional): Maximum number of responses (default: 10)
+- `since` (string, optional): Get responses submitted since this date (ISO format)
+- `fields` (array, optional): Specific field IDs to include
+
+**Example:**
+```json
+{
+  "form_id": "form_xyz789",
+  "limit": 25,
+  "since": "2024-01-01T00:00:00Z",
+  "fields": ["field_1", "field_5"]
+}
+```
+
+**Response Format:**
+```
+Form: Customer Satisfaction Survey
+Total responses: 142
+Showing 25 responses (limit: 25):
+
+Response ID: resp_001
+Submitted: 2024-01-15T14:30:00Z
+Answers:
+  How satisfied are you? (ID: field_1): Very Satisfied
+  Any comments? (ID: field_5): Great service!
+
+Response ID: resp_002
+...
+```
+
+**Supported Answer Types:**
+- `choice` - Single choice answers
+- `choices` - Multiple choice answers
+- `text` - Text responses
+- `number` - Numeric responses
+- `email` - Email addresses
+- `url` - URLs
+- `date` - Date responses
+</Accordion>
+
+## API Reference
+
+Base URL: `https://api.typeform.com`
+
+All endpoints use Bearer token authentication. The server uses async HTTP requests via `httpx`.
+
+### Key Endpoints Used
+
+- `GET /workspaces` - List workspaces
+- `GET /workspaces/{workspace_id}` - Get workspace details
+- `GET /forms` - List forms with optional filters
+- `GET /forms/{form_id}` - Get form details
+- `GET /forms/{form_id}/responses` - Get form responses
+
+## Pagination
+
+Form listings support pagination:
+- Default page size: 10 items
+- Maximum page size: 50 items (for workspace forms)
+- Use cursor-based pagination for large datasets
+
+## Error Handling
+
+The server handles:
+- Missing or incomplete data from API responses
+- Authentication failures
+- Network errors
+- Invalid resource URIs
+
+Errors are logged with full stack traces and returned as descriptive text content.

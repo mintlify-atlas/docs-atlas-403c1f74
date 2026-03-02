@@ -1,0 +1,252 @@
+---
+title: 'Google Calendar Server'
+description: 'Manage events and schedules in Google Calendar'
+icon: 'calendar'
+---
+
+## Overview
+
+The Google Calendar server enables AI agents to list, create, and update calendar events. It provides comprehensive calendar management capabilities.
+
+## Prerequisites
+
+- Python 3.11+
+- A Google Cloud Project with Google Calendar API enabled
+- OAuth 2.0 credentials with scope: `https://www.googleapis.com/auth/calendar`
+
+## Authentication
+
+### Setup OAuth Credentials
+
+1. [Create a new Google Cloud project](https://console.cloud.google.com/projectcreate)
+2. [Enable the Google Calendar API](https://console.cloud.google.com/workspace-api/products)
+3. [Configure an OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+4. Add OAuth scope: `https://www.googleapis.com/auth/calendar`
+5. [Create an OAuth Client ID](https://console.cloud.google.com/apis/credentials/oauthclient) for "Desktop App"
+6. Save credentials as `local_auth/oauth_configs/gcalendar/oauth.json`
+
+### Authenticate
+
+```bash
+python src/servers/gcalendar/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="list_events" icon="list">
+    **Description**: List events from Google Calendar for a specified time range
+    
+    **Parameters**:
+    - `calendar_id` (string, optional): Calendar ID (defaults to "primary")
+    - `days` (integer, optional): Number of days to look ahead (default: 7)
+    - `max_results` (integer, optional): Maximum number of events (default: 10)
+    
+    **Example**:
+    ```json
+    {
+      "calendar_id": "primary",
+      "days": 30,
+      "max_results": 50
+    }
+    ```
+    
+    **Returns**: List of events with full details
+  </Accordion>
+
+  <Accordion title="create_event" icon="plus">
+    **Description**: Create a new event in Google Calendar
+    
+    **Parameters**:
+    - `calendar_id` (string, optional): Calendar ID (defaults to "primary")
+    - `summary` (string, required): Event title
+    - `start_datetime` (string, required): Start date/time (format: "YYYY-MM-DD HH:MM" or "YYYY-MM-DD")
+    - `end_datetime` (string, required): End date/time (format: "YYYY-MM-DD HH:MM" or "YYYY-MM-DD")
+    - `description` (string, optional): Event description
+    - `location` (string, optional): Event location
+    - `attendees` (array, optional): List of attendee email addresses
+    
+    **Example**:
+    ```json
+    {
+      "summary": "Team Meeting",
+      "start_datetime": "2024-03-15 14:00",
+      "end_datetime": "2024-03-15 15:00",
+      "description": "Quarterly planning discussion",
+      "location": "Conference Room A",
+      "attendees": ["alice@example.com", "bob@example.com"]
+    }
+    ```
+    
+    **Returns**: Event details with ID and link
+  </Accordion>
+
+  <Accordion title="update_event" icon="pen-to-square">
+    **Description**: Update an existing event in Google Calendar
+    
+    **Parameters**:
+    - `calendar_id` (string, optional): Calendar ID (defaults to "primary")
+    - `event_id` (string, required): Event ID to update
+    - `summary` (string, optional): New event title
+    - `start_datetime` (string, optional): New start date/time
+    - `end_datetime` (string, optional): New end date/time
+    - `description` (string, optional): New description
+    - `location` (string, optional): New location
+    - `attendees` (array, optional): New attendee list
+    
+    **Example**:
+    ```json
+    {
+      "event_id": "abc123xyz789",
+      "summary": "Team Meeting (Rescheduled)",
+      "start_datetime": "2024-03-16 14:00",
+      "end_datetime": "2024-03-16 15:00"
+    }
+    ```
+    
+    **Returns**: Updated event details with link
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Google Calendar server provides calendar and event resources:
+
+### List Resources
+
+Provides access to:
+- All your calendars
+- Upcoming events (next 7 days)
+
+**URI Format**: 
+- `gcalendar:///{calendar_id}` - Specific calendar
+- `gcalendar:///upcoming` - Upcoming events
+
+### Read Resource
+
+Reads calendar events with details:
+- Event title
+- Start and end times
+- Location
+- Attendees
+- Description
+
+## Usage Examples
+
+### Listing Events
+
+```python
+# List upcoming events
+events = await call_tool("list_events", {
+    "days": 7,
+    "max_results": 20
+})
+
+# List events from specific calendar
+events = await call_tool("list_events", {
+    "calendar_id": "team@example.com",
+    "days": 14
+})
+```
+
+### Creating Events
+
+```python
+# Create a meeting with attendees
+await call_tool("create_event", {
+    "summary": "Project Kickoff",
+    "start_datetime": "2024-03-20 10:00",
+    "end_datetime": "2024-03-20 11:30",
+    "description": "Initial project planning session",
+    "location": "Zoom: https://zoom.us/j/123456789",
+    "attendees": [
+        "alice@example.com",
+        "bob@example.com",
+        "charlie@example.com"
+    ]
+})
+
+# Create an all-day event
+await call_tool("create_event", {
+    "summary": "Company Holiday",
+    "start_datetime": "2024-12-25",
+    "end_datetime": "2024-12-26",
+    "description": "Office closed"
+})
+```
+
+### Updating Events
+
+```python
+# First, get the event ID from list_events
+events = await call_tool("list_events", {"days": 7})
+event_id = events[0]["id"]
+
+# Update the event
+await call_tool("update_event", {
+    "event_id": event_id,
+    "summary": "Project Kickoff (Updated)",
+    "location": "Conference Room B"
+})
+
+# Reschedule an event
+await call_tool("update_event", {
+    "event_id": event_id,
+    "start_datetime": "2024-03-21 10:00",
+    "end_datetime": "2024-03-21 11:30"
+})
+```
+
+## Date/Time Formats
+
+### Timed Events
+
+Use format: `YYYY-MM-DD HH:MM` (24-hour format)
+
+```python
+"start_datetime": "2024-03-15 14:30"  # 2:30 PM
+"end_datetime": "2024-03-15 16:00"    # 4:00 PM
+```
+
+### All-Day Events
+
+Use format: `YYYY-MM-DD`
+
+```python
+"start_datetime": "2024-03-15"
+"end_datetime": "2024-03-16"  # Exclusive end date
+```
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server gcalendar --user-id local
+```
+
+## Best Practices
+
+1. **Time zones**: All times are stored in UTC
+2. **Event IDs**: Save event IDs from `list_events` for later updates
+3. **All-day events**: End date is exclusive (next day)
+4. **Attendees**: Providing attendee emails sends calendar invitations
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `list_events` | List events | View schedule, find conflicts |
+| `create_event` | Create event | Schedule meetings, add reminders |
+| `update_event` | Modify event | Reschedule, update details |
+
+## Calendar IDs
+
+- `primary` - Your primary calendar
+- Email address - Shared calendars (e.g., `team@example.com`)
+- Calendar ID - Specific calendar ID from list_resources
+
+## Related Resources
+
+- [Google Calendar API Documentation](https://developers.google.com/calendar/api)
+- [Event Resource Reference](https://developers.google.com/calendar/api/v3/reference/events)

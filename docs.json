@@ -1,122 +1,137 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "guMCP",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#6366f1",
+    "light": "#818cf8",
+    "dark": "#4f46e5"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/dvlpjrs/guMCP"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/dvlpjrs/guMCP"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Overview",
+            "pages": ["introduction", "architecture"]
+          },
+          {
+            "group": "Getting Started",
+            "pages": ["installation", "quickstart", "configuration"]
+          },
+          {
+            "group": "Core Concepts",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "concepts/mcp-protocol",
+              "concepts/transports",
+              "concepts/authentication"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Deployment",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "deployment/local-stdio",
+              "deployment/remote-sse",
+              "deployment/environment-setup"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Development",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "development/contributing",
+              "development/creating-servers",
+              "development/testing",
+              "development/code-style"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Server Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
+            "pages": ["servers/overview"]
+          },
+          {
+            "group": "Google Services",
             "pages": [
-              "api-reference/introduction"
+              "servers/google/gsheets",
+              "servers/google/gmail",
+              "servers/google/gdocs",
+              "servers/google/gdrive",
+              "servers/google/gcalendar"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Communication",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "servers/communication/slack",
+              "servers/communication/outlook"
+            ]
+          },
+          {
+            "group": "Productivity",
+            "pages": [
+              "servers/productivity/airtable",
+              "servers/productivity/linear",
+              "servers/productivity/attio",
+              "servers/productivity/hubspot",
+              "servers/productivity/typeform",
+              "servers/productivity/quickbooks"
+            ]
+          },
+          {
+            "group": "AI & Search",
+            "pages": ["servers/ai/perplexity"]
+          },
+          {
+            "group": "Testing",
+            "pages": ["servers/testing/simple-tools"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/base-client",
+              "api/auth/local-client",
+              "api/auth/gumloop-client",
+              "api/auth/factory"
+            ]
+          },
+          {
+            "group": "Server Core",
+            "pages": [
+              "api/servers/local",
+              "api/servers/remote",
+              "api/servers/main"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/utils/oauth",
+              "api/utils/service-helpers"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

@@ -1,0 +1,196 @@
+---
+title: "Local Server (stdio)"
+description: "Run MCP servers locally using stdin/stdout transport"
+---
+
+## Overview
+
+The local server module allows you to run MCP servers using standard input/output streams (stdio). This is the standard transport method for MCP servers running locally.
+
+**Source:** `src/servers/local.py`
+
+## Main Function
+
+**Source:** `src/servers/local.py:62`
+
+```python
+async def main():
+    """Main entry point for the stdio server"""
+```
+
+The main function handles:
+- Parsing command-line arguments
+- Loading the specified server module
+- Creating a server instance with the provided user_id
+- Starting the stdio server
+
+### Command-Line Arguments
+
+<ParamField path="--server" type="string" required>
+  Name of the server to run (e.g., "simple-tools-server", "slack"). Must correspond to a directory in the servers folder with a `main.py` file.
+</ParamField>
+
+<ParamField path="--user-id" type="string" default="local">
+  User ID for server context (optional). Used for credential lookup and user-specific operations.
+</ParamField>
+
+## Core Functions
+
+### run_stdio_server
+
+Runs the MCP server using stdin/stdout streams.
+
+**Source:** `src/servers/local.py:18`
+
+```python
+async def run_stdio_server(server, get_initialization_options):
+    """Run the server using stdin/stdout streams"""
+```
+
+<ParamField path="server" type="Server" required>
+  The MCP server instance to run
+</ParamField>
+
+<ParamField path="get_initialization_options" type="Callable" required>
+  Function that returns initialization options for the server
+</ParamField>
+
+### load_server
+
+Dynamically loads a server module by name.
+
+**Source:** `src/servers/local.py:29`
+
+```python
+async def load_server(server_name):
+    """Load a server module by name"""
+```
+
+<ParamField path="server_name" type="str" required>
+  Name of the server directory to load
+</ParamField>
+
+<ResponseField name="return" type="Tuple[Callable, Callable]">
+  Returns a tuple of (server_creator, get_initialization_options)
+</ResponseField>
+
+**Behavior:**
+- Looks for server at `src/servers/{server_name}/main.py`
+- Verifies the module has required `server` and `get_initialization_options` attributes
+- Lists available servers if the specified server is not found
+- Exits with error code 1 if server cannot be loaded
+
+## Usage
+
+### Basic Usage
+
+```bash
+python -m src.servers.local --server slack --user-id user123
+```
+
+### Running with Default User
+
+```bash
+python -m src.servers.local --server simple-tools-server
+```
+
+### Entry Point
+
+```python
+if __name__ == "__main__":
+    logger.info("Starting guMCP local stdio server")
+    asyncio.run(main())
+```
+
+## Server Requirements
+
+For a server to be loadable by the local server, it must:
+
+1. Be located in `src/servers/{server_name}/main.py`
+2. Export a `server` function or class that creates server instances
+3. Export a `get_initialization_options` function
+
+**Example server structure:**
+
+```python
+# src/servers/my-server/main.py
+from mcp.server import Server
+
+def server(user_id: str = "local"):
+    """Create and return a server instance"""
+    srv = Server("my-server")
+    # Configure server...
+    return srv
+
+def get_initialization_options(server_instance):
+    """Return initialization options"""
+    return {
+        "serverInfo": {
+            "name": "my-server",
+            "version": "1.0.0"
+        }
+    }
+```
+
+## Error Handling
+
+### Server Not Found
+
+```
+Server 'invalid-name' not found at /path/to/servers/invalid-name/main.py
+Available servers:
+  - slack
+  - simple-tools-server
+  - github
+```
+
+### Missing Required Attributes
+
+```
+Server 'my-server' does not have required server or get_initialization_options
+```
+
+## Logging
+
+The local server uses Python's logging module:
+
+```python
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("gumcp-local-stdio")
+```
+
+**Log messages:**
+- Server loading: `Loading server: {server_name}`
+- Server starting: `Starting local stdio server for server: {server_name} with user: {user_id}`
+- Stdio server: `Starting stdio server`
+
+## Integration with MCP Clients
+
+The stdio server can be configured in MCP client applications (like Claude Desktop):
+
+```json
+{
+  "mcpServers": {
+    "my-gumcp-server": {
+      "command": "python",
+      "args": [
+        "-m",
+        "src.servers.local",
+        "--server",
+        "slack",
+        "--user-id",
+        "user123"
+      ],
+      "cwd": "/path/to/guMCP"
+    }
+  }
+}
+```
+
+## See Also
+
+- [Remote Server (SSE)](/api/servers/remote) - HTTP/SSE transport for remote servers
+- [Main Server Entry Point](/api/servers/main) - Server launcher

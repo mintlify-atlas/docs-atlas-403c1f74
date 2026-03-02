@@ -1,0 +1,192 @@
+---
+title: 'Google Drive Server'
+description: 'Search and access files in Google Drive'
+icon: 'folder'
+---
+
+## Overview
+
+The Google Drive server enables AI agents to search and access files stored in Google Drive. It provides read-only access to files and supports various file types.
+
+## Prerequisites
+
+- Python 3.11+
+- A Google Cloud Project with Google Drive API enabled
+- OAuth 2.0 credentials with scope: `https://www.googleapis.com/auth/drive.readonly`
+
+## Authentication
+
+### Setup OAuth Credentials
+
+1. [Create a new Google Cloud project](https://console.cloud.google.com/projectcreate)
+2. [Enable the Google Drive API](https://console.cloud.google.com/workspace-api/products)
+3. [Configure an OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+4. Add OAuth scope: `https://www.googleapis.com/auth/drive.readonly`
+5. [Create an OAuth Client ID](https://console.cloud.google.com/apis/credentials/oauthclient) for "Desktop App"
+6. Save credentials as `local_auth/oauth_configs/gdrive/oauth.json`
+
+### Authenticate
+
+```bash
+python src/servers/gdrive/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="search" icon="magnifying-glass">
+    **Description**: Search for files in Google Drive
+    
+    **Parameters**:
+    - `query` (string, required): Search query to find files
+    
+    **Example**:
+    ```json
+    {
+      "query": "project proposal"
+    }
+    ```
+    
+    **Returns**: List of matching files with names, IDs, MIME types, and metadata
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Google Drive server provides access to file resources:
+
+### List Resources
+
+Lists files from your Google Drive (up to 10 at a time).
+
+**URI Format**: `gdrive:///{file_id}`
+
+### Read Resource
+
+Reads file content with automatic format handling:
+
+#### Google Workspace Files
+
+Automatically exports Google Workspace files to readable formats:
+
+| File Type | Export Format |
+|-----------|---------------|
+| Google Docs | Markdown |
+| Google Sheets | CSV |
+| Google Slides | Plain text |
+| Google Drawings | PNG |
+
+#### Regular Files
+
+- Text files (`.txt`, `.md`, `.json`) are returned as UTF-8 text
+- Binary files are returned as-is
+
+## Usage Examples
+
+### Searching for Files
+
+```python
+# Search for all PDFs
+files = await call_tool("search", {
+    "query": "type:pdf"
+})
+
+# Search by name
+files = await call_tool("search", {
+    "query": "annual report 2024"
+})
+
+# Search within a specific folder (requires folder ID)
+files = await call_tool("search", {
+    "query": "'folder_id' in parents"
+})
+```
+
+### Reading Files
+
+```python
+# List available files
+files = await list_resources()
+
+# Read a specific file
+for file in files:
+    content = await read_resource(file.uri)
+    print(f"File: {file.name}")
+    print(f"Content: {content}")
+```
+
+### Accessing Google Docs
+
+```python
+# Search for Google Docs
+docs = await call_tool("search", {
+    "query": "type:document"
+})
+
+# Read the document (automatically exports to markdown)
+for doc in docs:
+    content = await read_resource(f"gdrive:///{doc['id']}")
+    # Content is now in markdown format
+```
+
+## Google Drive Search Syntax
+
+The search tool supports Google Drive's query syntax:
+
+| Query | Description | Example |
+|-------|-------------|---------|
+| `type:` | File type | `type:pdf`, `type:document` |
+| `title:` | File name | `title:"Project Plan"` |
+| `fullText:` | Content search | `fullText:"quarterly results"` |
+| `modifiedDate` | Date modified | `modifiedDate > '2024-01-01'` |
+| `in parents` | In folder | `'folder_id' in parents` |
+| `trashed = false` | Not in trash | `trashed = false` |
+
+### Common File Types
+
+- `type:document` - Google Docs
+- `type:spreadsheet` - Google Sheets
+- `type:presentation` - Google Slides
+- `type:pdf` - PDF files
+- `type:folder` - Folders
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server gdrive --user-id local
+```
+
+## Best Practices
+
+1. **Specific queries**: Use specific search terms to reduce results
+2. **File types**: Filter by file type to narrow searches
+3. **Read-only**: This server provides read-only access
+4. **Export formats**: Google Workspace files are automatically converted
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `search` | Find files | Locate documents, find specific file types |
+
+## Supported MIME Types
+
+Google Workspace files are automatically exported:
+
+- `application/vnd.google-apps.document` → `text/markdown`
+- `application/vnd.google-apps.spreadsheet` → `text/csv`
+- `application/vnd.google-apps.presentation` → `text/plain`
+- `application/vnd.google-apps.drawing` → `image/png`
+
+## Limitations
+
+- Read-only access (no file uploads or modifications)
+- Binary files larger than available memory may cause issues
+- Some file formats may not export perfectly
+
+## Related Resources
+
+- [Google Drive API Documentation](https://developers.google.com/drive/api)
+- [Drive Search Query Terms](https://developers.google.com/drive/api/guides/search-files)

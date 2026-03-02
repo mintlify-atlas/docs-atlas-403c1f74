@@ -1,0 +1,138 @@
+---
+title: "GumloopAuthClient"
+description: "Gumloop API-based authentication client"
+---
+
+## Overview
+
+`GumloopAuthClient` is an implementation of `BaseAuthClient` that uses Gumloop's infrastructure to manage credentials. It retrieves credentials that have been linked at https://gumloop.com/credentials.
+
+**Source:** `src/auth/clients/GumloopAuthClient.py:11`
+
+## Class Definition
+
+```python
+from .BaseAuthClient import BaseAuthClient, CredentialsT
+
+class GumloopAuthClient(BaseAuthClient[CredentialsT]):
+    """Implementation that uses Gumloop's infrastructure."""
+```
+
+## Constructor
+
+**Source:** `src/auth/clients/GumloopAuthClient.py:18`
+
+```python
+def __init__(self, api_key: Optional[str] = None):
+```
+
+<ParamField path="api_key" type="Optional[str]">
+  Gumloop API key for service authentication. Required for API calls.
+</ParamField>
+
+<Warning>
+  If `api_key` is not provided, the client will be created but functionality will be limited.
+</Warning>
+
+## Methods
+
+### get_user_credentials
+
+Retrieves user credentials from the Gumloop API.
+
+**Source:** `src/auth/clients/GumloopAuthClient.py:35`
+
+```python
+def get_user_credentials(
+    self, service_name: str, user_id: str
+) -> Optional[CredentialsT]:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service (e.g., "gdrive", "github", "slack")
+</ParamField>
+
+<ParamField path="user_id" type="str" required>
+  Identifier for the user
+</ParamField>
+
+<ResponseField name="return" type="Optional[CredentialsT]">
+  Credentials data from Gumloop API as a dictionary, or None if retrieval fails
+</ResponseField>
+
+**API Endpoint:** `GET {api_base_url}/auth/{service_name}/credentials?user_id={user_id}`
+
+**Authentication:** Bearer token using the API key
+
+## Configuration
+
+### Environment Variables
+
+<ParamField path="GUMLOOP_API_BASE_URL" type="string">
+  Base URL for Gumloop API. Defaults to `https://api.gumloop.com/api/v1`
+</ParamField>
+
+## Implementation Notes
+
+- Only implements `get_user_credentials()` - credential saving is managed through Gumloop's web interface
+- Does not implement `get_oauth_config()` or `save_user_credentials()` as these are handled by Gumloop's infrastructure
+- Returns credentials as a dictionary; the caller is responsible for converting to the appropriate credentials type
+- Logs errors but returns `None` on failure rather than raising exceptions
+
+## Example Usage
+
+```python
+from src.auth.clients.GumloopAuthClient import GumloopAuthClient
+import os
+
+# Create client with API key
+api_key = os.environ.get("GUMLOOP_API_KEY")
+client = GumloopAuthClient(api_key=api_key)
+
+# Get user credentials
+creds = client.get_user_credentials("slack", "user123")
+
+if creds:
+    access_token = creds.get("access_token")
+    # Use credentials...
+else:
+    print("Failed to retrieve credentials")
+```
+
+## Error Handling
+
+The client handles errors gracefully:
+
+- Returns `None` if credentials are not found (404)
+- Returns `None` if API request fails
+- Logs all errors for debugging
+
+```python
+# Example: Handling missing credentials
+creds = client.get_user_credentials("slack", "user123")
+
+if not creds:
+    # Credentials not found or API error
+    # Prompt user to link credentials at gumloop.com
+    pass
+```
+
+## API Response Format
+
+The Gumloop API returns credentials in JSON format:
+
+```json
+{
+  "access_token": "xoxb-...",
+  "refresh_token": "xoxr-...",
+  "expires_at": 1234567890,
+  "token_type": "Bearer",
+  "scope": "chat:write,channels:read"
+}
+```
+
+## See Also
+
+- [BaseAuthClient](/api/auth/base-client) - Abstract base class
+- [LocalAuthClient](/api/auth/local-client) - Alternative local file implementation
+- [create_auth_client()](/api/auth/factory) - Factory function

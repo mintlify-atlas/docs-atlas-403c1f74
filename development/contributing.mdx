@@ -1,0 +1,154 @@
+---
+title: Contributing Guidelines
+description: How to contribute to guMCP development
+---
+
+Thank you for your interest in contributing to guMCP! This guide will help you get started with development and understand our contribution process.
+
+## Development Environment Setup
+
+### Prerequisites
+
+- Python 3.11
+- Git
+
+### Setup Steps
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/gumloop/guMCP.git
+    cd guMCP
+    ```
+  </Step>
+
+  <Step title="Create a virtual environment">
+    ```bash
+    python -m venv venv
+    ```
+  </Step>
+
+  <Step title="Activate the virtual environment">
+    On macOS/Linux:
+    ```bash
+    source venv/bin/activate
+    ```
+
+    On Windows:
+    ```bash
+    venv\Scripts\activate
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    # Install main dependencies
+    pip install -r requirements.txt
+
+    # Install development dependencies
+    pip install -r requirements-dev.txt
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Copy the example .env file and update it with your configuration:
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+</Steps>
+
+## Project Structure
+
+Understanding the project layout:
+
+- `src/` - Main source code
+  - `auth/` - Authentication components
+  - `servers/` - Server implementations
+  - `utils/` - Utility functions and helpers
+- `tests/` - Test suite
+  - `servers/` - Server-specific tests
+  - `clients/` - Test client implementations
+- `scripts/` - Utility scripts for development
+
+## Pull Request Process
+
+<Steps>
+  <Step title="Fork and create branch">
+    Fork the repository and create your branch from `main`:
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+  </Step>
+
+  <Step title="Make your changes">
+    - Follow the project's code style (see [Code Style](/development/code-style))
+    - Add tests for any new functionality
+    - Update documentation as needed
+  </Step>
+
+  <Step title="Run quality checks">
+    Ensure all tests pass and code meets quality standards:
+    ```bash
+    # Format code
+    python scripts/format.py
+
+    # Run linting
+    python scripts/lint.py
+
+    # Run tests
+    python tests/servers/test_runner.py --server=your-server
+    ```
+  </Step>
+
+  <Step title="Submit pull request">
+    Submit a pull request with:
+    - Clear description of changes
+    - Why the changes are needed
+    - Any related issue numbers
+  </Step>
+</Steps>
+
+## Requested Contributions
+
+We're particularly interested in contributions for:
+
+- **Add Support for New MCP Spec**
+  - [Streamable HTTP Transport](https://github.com/gumloop/guMCP/issues/26)
+  - Client/Server Authentication Mechanism
+- **[Add Support for FastMCP](https://github.com/gumloop/guMCP/issues/24)**
+- **New Server Implementations** - See our [server creation guide](/development/creating-servers)
+
+## Writing Tests
+
+When adding new features:
+
+1. **Write tests for new functionality** - All servers should have a corresponding `tests.py` file
+2. **Ensure all tests pass** - Run the full test suite before submitting
+3. **Use pytest fixtures** - Leverage the existing test infrastructure
+4. **Include integration tests** - Have some tests that do NOT use mocks and require actual authentication
+5. **Use descriptive test names** - Follow the pattern `test_<functionality>_<expected_behavior>`
+
+See our [Testing Guide](/development/testing) for detailed information.
+
+## Versioning
+
+We follow [Semantic Versioning](https://semver.org/) for this project:
+
+- **MAJOR**: Incompatible API changes
+- **MINOR**: Backwards-compatible functionality additions
+- **PATCH**: Backwards-compatible bug fixes
+
+## Getting Help
+
+If you have questions or need help:
+
+- Open an issue in the [GitHub repository](https://github.com/gumloop/guMCP/issues)
+- Review existing documentation and examples
+- Contact the project maintainers
+
+## License
+
+By contributing to this project, you agree that your contributions will be licensed under the project's license.
+
+Thank you for contributing to guMCP!

@@ -1,0 +1,292 @@
+---
+title: 'Google Sheets Server'
+description: 'Read, write, and update Google Sheets spreadsheets'
+icon: 'table'
+---
+
+## Overview
+
+The Google Sheets server enables AI agents to interact with Google Sheets spreadsheets. It provides tools for reading, writing, updating, and managing spreadsheet data.
+
+## Prerequisites
+
+- Python 3.11+
+- A Google Cloud project with the **Google Sheets API enabled**
+- OAuth 2.0 credentials configured for desktop application access
+
+## Authentication
+
+### Setup OAuth Credentials
+
+1. Create a Google Cloud project in the [GCP Console](https://console.cloud.google.com/projectcreate)
+2. Enable the Google Sheets API
+3. Create OAuth 2.0 credentials (Desktop App)
+4. Download the credentials JSON file
+5. Save it as `local_auth/oauth_configs/gsheets/oauth.json`
+
+### Authenticate
+
+```bash
+python src/servers/gsheets/main.py auth
+```
+
+This launches a browser-based OAuth flow to obtain and save your credentials.
+
+## Available Tools
+
+The Google Sheets server provides the following tools:
+
+<AccordionGroup>
+  <Accordion title="create-sheet" icon="plus">
+    **Description**: Create a new Google Sheets spreadsheet
+    
+    **Parameters**:
+    - `title` (string, required): The title of the new spreadsheet
+    
+    **Example**:
+    ```json
+    {
+      "title": "Q1 Sales Data"
+    }
+    ```
+    
+    **Returns**: Spreadsheet ID and URL
+  </Accordion>
+
+  <Accordion title="get-spreadsheet-info" icon="info">
+    **Description**: Get metadata about a spreadsheet (title, sheets, properties)
+    
+    **Parameters**:
+    - `spreadsheet_url` (string, required): The Google Sheets URL
+    
+    **Example**:
+    ```json
+    {
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123..."
+    }
+    ```
+    
+    **Returns**: Spreadsheet metadata including title and sheet names
+  </Accordion>
+
+  <Accordion title="get-sheet-names" icon="list">
+    **Description**: List all sheet (tab) names in a spreadsheet
+    
+    **Parameters**:
+    - `spreadsheet_url` (string, required): The Google Sheets URL
+    
+    **Example**:
+    ```json
+    {
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123..."
+    }
+    ```
+    
+    **Returns**: Array of sheet names
+  </Accordion>
+
+  <Accordion title="batch-get" icon="download">
+    **Description**: Read values from multiple ranges in a spreadsheet
+    
+    **Parameters**:
+    - `spreadsheet_url` (string, required): The Google Sheets URL
+    - `ranges` (array, required): Array of A1 notation ranges (e.g., ["Sheet1!A1:C10", "Sheet2!A1:B5"])
+    
+    **Example**:
+    ```json
+    {
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123...",
+      "ranges": ["Sheet1!A1:C10", "Summary!A1:B5"]
+    }
+    ```
+    
+    **Returns**: Values from all requested ranges
+  </Accordion>
+
+  <Accordion title="batch-update" icon="upload">
+    **Description**: Write values to multiple ranges in a spreadsheet
+    
+    **Parameters**:
+    - `spreadsheet_url` (string, required): The Google Sheets URL
+    - `data` (array, required): Array of range/values pairs
+    
+    **Example**:
+    ```json
+    {
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123...",
+      "data": [
+        {
+          "range": "Sheet1!A1:B2",
+          "values": [["Name", "Age"], ["John", "30"]]
+        }
+      ]
+    }
+    ```
+    
+    **Returns**: Confirmation of successful update
+  </Accordion>
+
+  <Accordion title="append-values" icon="circle-plus">
+    **Description**: Append new rows to the end of a range
+    
+    **Parameters**:
+    - `spreadsheet_url` (string, required): The Google Sheets URL
+    - `range` (string, required): A1 notation range
+    - `values` (array, required): 2D array of values to append
+    
+    **Example**:
+    ```json
+    {
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123...",
+      "range": "Sheet1!A1:C1",
+      "values": [["Alice", "25", "Engineer"], ["Bob", "30", "Designer"]]
+    }
+    ```
+    
+    **Returns**: Number of rows appended
+  </Accordion>
+
+  <Accordion title="lookup-row" icon="magnifying-glass">
+    **Description**: Search for a row containing a specific value
+    
+    **Parameters**:
+    - `spreadsheet_url` (string, required): The Google Sheets URL
+    - `range` (string, required): A1 notation range to search
+    - `value` (string, required): Value to search for
+    
+    **Example**:
+    ```json
+    {
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123...",
+      "range": "Sheet1!A1:C100",
+      "value": "John"
+    }
+    ```
+    
+    **Returns**: First matching row or "Value not found"
+  </Accordion>
+
+  <Accordion title="clear-values" icon="eraser">
+    **Description**: Clear all values in a specified range
+    
+    **Parameters**:
+    - `spreadsheet_url` (string, required): The Google Sheets URL
+    - `range` (string, required): A1 notation range to clear
+    
+    **Example**:
+    ```json
+    {
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123...",
+      "range": "Sheet1!A1:Z100"
+    }
+    ```
+    
+    **Returns**: Confirmation of successful clear
+  </Accordion>
+
+  <Accordion title="copy-sheet" icon="copy">
+    **Description**: Copy a sheet from one spreadsheet to another
+    
+    **Parameters**:
+    - `source_spreadsheet_id` (string, required): Source spreadsheet ID
+    - `source_sheet_id` (integer, required): Source sheet ID (not name)
+    - `destination_spreadsheet_id` (string, required): Destination spreadsheet ID
+    
+    **Example**:
+    ```json
+    {
+      "source_spreadsheet_id": "abc123",
+      "source_sheet_id": 0,
+      "destination_spreadsheet_id": "xyz789"
+    }
+    ```
+    
+    **Returns**: New sheet ID in destination spreadsheet
+  </Accordion>
+</AccordionGroup>
+
+## Usage Examples
+
+### Creating and Populating a Spreadsheet
+
+```python
+# Create a new spreadsheet
+result = await call_tool("create-sheet", {
+    "title": "Sales Report Q1 2024"
+})
+
+# Add headers and data
+await call_tool("batch-update", {
+    "spreadsheet_url": result["url"],
+    "data": [{
+        "range": "Sheet1!A1:D1",
+        "values": [["Date", "Product", "Quantity", "Revenue"]]
+    }]
+})
+
+# Append sales data
+await call_tool("append-values", {
+    "spreadsheet_url": result["url"],
+    "range": "Sheet1!A2:D2",
+    "values": [
+        ["2024-01-15", "Widget A", "100", "$5,000"],
+        ["2024-01-16", "Widget B", "50", "$3,500"]
+    ]
+})
+```
+
+### Reading and Searching Data
+
+```python
+# Get all data from multiple sheets
+data = await call_tool("batch-get", {
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123...",
+    "ranges": ["Sales!A1:D100", "Summary!A1:B10"]
+})
+
+# Search for a specific customer
+customer = await call_tool("lookup-row", {
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/abc123...",
+    "range": "Customers!A1:E1000",
+    "value": "Acme Corp"
+})
+```
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server gsheets --user-id local
+```
+
+### Testing Connection
+
+```bash
+python RemoteMCPTestClient.py --endpoint http://localhost:8000/gsheets/local
+```
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `create-sheet` | Create spreadsheet | Initialize new workbooks |
+| `get-spreadsheet-info` | Get metadata | Discover sheet structure |
+| `batch-get` | Read multiple ranges | Fetch data efficiently |
+| `batch-update` | Write multiple ranges | Bulk updates |
+| `append-values` | Add new rows | Log entries, add records |
+| `lookup-row` | Find specific data | Search operations |
+| `clear-values` | Delete range data | Reset sections |
+| `copy-sheet` | Duplicate sheets | Template operations |
+
+## Best Practices
+
+1. **Use batch operations**: Combine multiple reads/writes into single batch-get/batch-update calls
+2. **A1 notation**: Always specify ranges using A1 notation (e.g., "Sheet1!A1:C10")
+3. **Error handling**: Check for invalid URLs or non-existent ranges
+4. **Rate limits**: Be mindful of Google Sheets API quotas
+
+## Related Resources
+
+- [Google Sheets API Documentation](https://developers.google.com/sheets/api)
+- [A1 Notation Reference](https://developers.google.com/sheets/api/guides/concepts#expandable-1)

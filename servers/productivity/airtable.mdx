@@ -1,0 +1,345 @@
+---
+title: 'Airtable Server'
+description: 'Interact with Airtable bases and records'
+icon: 'database'
+---
+
+## Overview
+
+The Airtable server enables AI agents to read, create, and update records in Airtable bases. It provides comprehensive access to your Airtable data.
+
+## Prerequisites
+
+- Python 3.11+
+- An Airtable account and API access
+- An Airtable OAuth application with the following scopes:
+  - `data.records:read`
+  - `data.records:write`
+  - `schema.bases:read`
+
+## Authentication
+
+### Create Airtable OAuth App
+
+1. Follow the [Airtable OAuth documentation](https://airtable.com/developers/web/guides/oauth-integrations)
+2. Create an OAuth integration
+3. Add required scopes (see above)
+4. Note your Client ID, Client Secret, and Redirect URI
+
+### Setup OAuth Configuration
+
+Create `local_auth/oauth_configs/airtable/oauth.json`:
+
+```json
+{
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "redirect_uri": "https://your-redirect-uri"
+}
+```
+
+### Authenticate
+
+```bash
+python src/servers/airtable/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="read_records" icon="eye">
+    **Description**: Read records from an Airtable table
+    
+    **Parameters**:
+    - `base_id` (string, required): Airtable base ID
+    - `table_id` (string, required): Airtable table ID
+    - `max_records` (integer, optional): Maximum number of records to return
+    - `filter_by_formula` (string, optional): Airtable formula to filter records
+    
+    **Example**:
+    ```json
+    {
+      "base_id": "appABC123",
+      "table_id": "tblDEF456",
+      "max_records": 50,
+      "filter_by_formula": "{Status} = 'Active'"
+    }
+    ```
+    
+    **Returns**: Array of records with fields and IDs
+  </Accordion>
+
+  <Accordion title="create_records" icon="plus">
+    **Description**: Create new records in an Airtable table
+    
+    **Parameters**:
+    - `base_id` (string, required): Airtable base ID
+    - `table_id` (string, required): Airtable table ID
+    - `records` (array, required): Array of records to create
+    
+    **Example**:
+    ```json
+    {
+      "base_id": "appABC123",
+      "table_id": "tblDEF456",
+      "records": [
+        {
+          "fields": {
+            "Name": "John Doe",
+            "Email": "john@example.com",
+            "Status": "Active"
+          }
+        },
+        {
+          "fields": {
+            "Name": "Jane Smith",
+            "Email": "jane@example.com",
+            "Status": "Pending"
+          }
+        }
+      ]
+    }
+    ```
+    
+    **Returns**: Created record IDs
+  </Accordion>
+
+  <Accordion title="update_records" icon="pen-to-square">
+    **Description**: Update existing records in an Airtable table
+    
+    **Parameters**:
+    - `base_id` (string, required): Airtable base ID
+    - `table_id` (string, required): Airtable table ID
+    - `records` (array, required): Array of records to update (must include record IDs)
+    
+    **Example**:
+    ```json
+    {
+      "base_id": "appABC123",
+      "table_id": "tblDEF456",
+      "records": [
+        {
+          "id": "recXYZ789",
+          "fields": {
+            "Status": "Completed",
+            "CompletedDate": "2024-03-15"
+          }
+        }
+      ]
+    }
+    ```
+    
+    **Returns**: Updated record IDs
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Airtable server provides access to bases and tables:
+
+### List Resources
+
+Lists all accessible bases and their tables.
+
+**URI Format**: `airtable:///{base_id}/{table_id}`
+
+### Read Resource
+
+Reads records from a table with all fields in JSON format.
+
+## Usage Examples
+
+### Reading Records
+
+```python
+# Get all records from a table
+records = await call_tool("read_records", {
+    "base_id": "appABC123",
+    "table_id": "tblDEF456"
+})
+
+# Filter records by status
+records = await call_tool("read_records", {
+    "base_id": "appABC123",
+    "table_id": "tblDEF456",
+    "filter_by_formula": "{Status} = 'In Progress'",
+    "max_records": 100
+})
+
+# Complex filter
+records = await call_tool("read_records", {
+    "base_id": "appABC123",
+    "table_id": "tblDEF456",
+    "filter_by_formula": "AND({Priority} = 'High', {DueDate} <= TODAY())"
+})
+```
+
+### Creating Records
+
+```python
+# Create a single record
+await call_tool("create_records", {
+    "base_id": "appABC123",
+    "table_id": "tblDEF456",
+    "records": [
+        {
+            "fields": {
+                "Task Name": "Complete documentation",
+                "Assignee": "Alice",
+                "Priority": "High",
+                "Status": "Not Started"
+            }
+        }
+    ]
+})
+
+# Bulk create records
+await call_tool("create_records", {
+    "base_id": "appABC123",
+    "table_id": "tblDEF456",
+    "records": [
+        {"fields": {"Name": "Task 1", "Status": "Todo"}},
+        {"fields": {"Name": "Task 2", "Status": "Todo"}},
+        {"fields": {"Name": "Task 3", "Status": "Todo"}}
+    ]
+})
+```
+
+### Updating Records
+
+```python
+# Update a record's status
+await call_tool("update_records", {
+    "base_id": "appABC123",
+    "table_id": "tblDEF456",
+    "records": [
+        {
+            "id": "recXYZ789",
+            "fields": {
+                "Status": "Completed",
+                "Progress": 100
+            }
+        }
+    ]
+})
+
+# Bulk update multiple records
+await call_tool("update_records", {
+    "base_id": "appABC123",
+    "table_id": "tblDEF456",
+    "records": [
+        {"id": "rec123", "fields": {"Status": "In Review"}},
+        {"id": "rec456", "fields": {"Status": "In Review"}},
+        {"id": "rec789", "fields": {"Status": "In Review"}}
+    ]
+})
+```
+
+## Airtable Formula Syntax
+
+The `filter_by_formula` parameter uses Airtable's formula language:
+
+### Comparison Operators
+
+```javascript
+// Equals
+"{Status} = 'Active'"
+
+// Not equals
+"{Status} != 'Archived'"
+
+// Greater than
+"{Priority} > 3"
+
+// Less than or equal
+"{DueDate} <= TODAY()"
+```
+
+### Logical Operators
+
+```javascript
+// AND
+"AND({Status} = 'Active', {Priority} = 'High')"
+
+// OR
+"OR({Status} = 'Todo', {Status} = 'In Progress')"
+
+// NOT
+"NOT({Status} = 'Archived')"
+```
+
+### Common Functions
+
+```javascript
+// TODAY() - Current date
+"{DueDate} = TODAY()"
+
+// SEARCH() - Text search
+"SEARCH('urgent', {Notes}) != ''"
+
+// IS_AFTER() - Date comparison
+"IS_AFTER({DueDate}, TODAY())"
+```
+
+## Finding Base and Table IDs
+
+### Base ID
+
+Found in your Airtable base URL:
+```
+https://airtable.com/appABC123/tblDEF456
+              ^^^^^^^^^
+              Base ID
+```
+
+### Table ID
+
+Also in the URL when viewing a table:
+```
+https://airtable.com/appABC123/tblDEF456
+                              ^^^^^^^^^
+                              Table ID
+```
+
+Alternatively, use the `list_resources` endpoint to discover bases and tables.
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server airtable --user-id local
+```
+
+## Best Practices
+
+1. **Batch operations**: Create/update multiple records in a single call
+2. **Use filters**: Reduce data transfer with `filter_by_formula`
+3. **Field names**: Match exact field names from your Airtable base
+4. **Rate limiting**: Airtable has rate limits - the server implements exponential backoff
+5. **Record IDs**: Save record IDs when creating for later updates
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `read_records` | Read data | Query tables, filter records |
+| `create_records` | Create data | Add new records, bulk import |
+| `update_records` | Modify data | Update status, edit fields |
+
+## Field Types
+
+Airtable supports various field types - match your data to the field type:
+
+- **Single line text**: `"Name": "John Doe"`
+- **Number**: `"Count": 42`
+- **Checkbox**: `"IsActive": true`
+- **Date**: `"DueDate": "2024-03-15"`
+- **Single select**: `"Status": "In Progress"`
+- **Multiple select**: `"Tags": ["urgent", "important"]`
+- **Linked records**: `"RelatedTasks": ["recXYZ", "recABC"]`
+
+## Related Resources
+
+- [Airtable API Documentation](https://airtable.com/developers/web/api/introduction)
+- [Formula Field Reference](https://support.airtable.com/docs/formula-field-reference)

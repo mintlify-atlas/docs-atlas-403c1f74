@@ -1,0 +1,184 @@
+---
+title: "LocalAuthClient"
+description: "File-based authentication client for local development"
+---
+
+## Overview
+
+`LocalAuthClient` is an implementation of `BaseAuthClient` that reads and writes credentials to local files. It's designed for local development and self-hosted installations.
+
+**Source:** `src/auth/clients/LocalAuthClient.py:17`
+
+## Class Definition
+
+```python
+from .BaseAuthClient import BaseAuthClient, CredentialsT
+
+class LocalAuthClient(BaseAuthClient[CredentialsT]):
+    """Implementation that reads/writes credentials to local files."""
+```
+
+## Constructor
+
+**Source:** `src/auth/clients/LocalAuthClient.py:25`
+
+```python
+def __init__(
+    self,
+    oauth_config_base_dir: Optional[str] = None,
+    credentials_base_dir: Optional[str] = None,
+):
+```
+
+<ParamField path="oauth_config_base_dir" type="Optional[str]">
+  Directory containing OAuth config files. Defaults to `GUMCP_OAUTH_CONFIG_DIR` environment variable or `{project_root}/local_auth/oauth_configs`
+</ParamField>
+
+<ParamField path="credentials_base_dir" type="Optional[str]">
+  Base directory to store user credentials. Defaults to `GUMCP_CREDENTIALS_DIR` environment variable or `{project_root}/local_auth/credentials`
+</ParamField>
+
+## Methods
+
+### get_oauth_config
+
+Retrieves OAuth configuration from a local JSON file.
+
+**Source:** `src/auth/clients/LocalAuthClient.py:56`
+
+```python
+def get_oauth_config(self, service_name: str) -> Dict[str, Any]:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service (e.g., "gdrive", "github", "slack")
+</ParamField>
+
+<ResponseField name="return" type="Dict[str, Any]">
+  OAuth configuration loaded from `{oauth_config_base_dir}/{service_name}/oauth.json`
+</ResponseField>
+
+**Raises:**
+- `ValueError` - If OAuth config directory is not set
+- `FileNotFoundError` - If config file doesn't exist at expected path
+
+### get_user_credentials
+
+Retrieves user credentials from a local JSON file.
+
+**Source:** `src/auth/clients/LocalAuthClient.py:74`
+
+```python
+def get_user_credentials(
+    self, service_name: str, user_id: str
+) -> Optional[CredentialsT]:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service
+</ParamField>
+
+<ParamField path="user_id" type="str" required>
+  Identifier for the user
+</ParamField>
+
+<ResponseField name="return" type="Optional[CredentialsT]">
+  Credentials data loaded from `{credentials_base_dir}/{service_name}/{user_id}_credentials.json`, or None if file doesn't exist
+</ResponseField>
+
+**Raises:**
+- `ValueError` - If credentials directory is not set
+
+### save_user_credentials
+
+Saves user credentials to a local JSON file.
+
+**Source:** `src/auth/clients/LocalAuthClient.py:95`
+
+```python
+def save_user_credentials(
+    self,
+    service_name: str,
+    user_id: str,
+    credentials: Union[CredentialsT, Dict[str, Any]],
+) -> None:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service
+</ParamField>
+
+<ParamField path="user_id" type="str" required>
+  Identifier for the user
+</ParamField>
+
+<ParamField path="credentials" type="Union[CredentialsT, Dict[str, Any]]" required>
+  Credentials to save. Can be a dict, an object with a `to_json()` method, or any JSON-serializable object
+</ParamField>
+
+**Raises:**
+- `ValueError` - If credentials directory is not set
+
+**File Location:** `{credentials_base_dir}/{service_name}/{user_id}_credentials.json`
+
+## File Structure
+
+### OAuth Config Files
+
+```
+{oauth_config_base_dir}/
+  ├── slack/
+  │   └── oauth.json
+  ├── gdrive/
+  │   └── oauth.json
+  └── github/
+      └── oauth.json
+```
+
+### Credentials Files
+
+```
+{credentials_base_dir}/
+  ├── slack/
+  │   ├── user1_credentials.json
+  │   └── user2_credentials.json
+  └── gdrive/
+      └── user1_credentials.json
+```
+
+## Environment Variables
+
+<ParamField path="GUMCP_OAUTH_CONFIG_DIR" type="string">
+  Override default OAuth config directory location
+</ParamField>
+
+<ParamField path="GUMCP_CREDENTIALS_DIR" type="string">
+  Override default credentials directory location
+</ParamField>
+
+## Example Usage
+
+```python
+from src.auth.clients.LocalAuthClient import LocalAuthClient
+
+# Create client with default directories
+client = LocalAuthClient()
+
+# Get OAuth config
+config = client.get_oauth_config("slack")
+
+# Get user credentials
+creds = client.get_user_credentials("slack", "user123")
+
+# Save credentials
+client.save_user_credentials("slack", "user123", {
+    "access_token": "xoxb-...",
+    "refresh_token": "xoxr-...",
+})
+```
+
+## See Also
+
+- [BaseAuthClient](/api/auth/base-client) - Abstract base class
+- [GumloopAuthClient](/api/auth/gumloop-client) - Alternative cloud-based implementation
+- [create_auth_client()](/api/auth/factory) - Factory function

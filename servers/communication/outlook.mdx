@@ -1,0 +1,265 @@
+---
+title: 'Outlook Server'
+description: 'Read and send emails through Microsoft Outlook'
+icon: 'microsoft'
+---
+
+## Overview
+
+The Outlook server enables AI agents to read and send emails through Microsoft Outlook using the Microsoft Graph API.
+
+## Prerequisites
+
+- Python 3.11+
+- A Microsoft Entra ID (formerly Azure AD) application registration
+- OAuth 2.0 credentials with the following Microsoft Graph API scopes:
+  - `https://graph.microsoft.com/Mail.ReadWrite`
+  - `https://graph.microsoft.com/Mail.Send`
+  - `offline_access`
+
+## Authentication
+
+### Register Microsoft App
+
+1. [Register a new application in Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)
+2. Add required Microsoft Graph API permissions:
+   - `Mail.ReadWrite`
+   - `Mail.Send`
+3. Configure a redirect URI (e.g., `http://localhost:8080`)
+4. Create a client secret
+
+### Setup OAuth Configuration
+
+Create `local_auth/oauth_configs/outlook/oauth.json`:
+
+```json
+{
+  "client_id": "your_application_id",
+  "client_secret": "your_client_secret",
+  "redirect_uri": "http://localhost:8080"
+}
+```
+
+### Authenticate
+
+```bash
+python src/servers/outlook/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="read_emails" icon="envelope-open">
+    **Description**: Read emails from Outlook with optional filtering
+    
+    **Parameters**:
+    - `folder` (string, optional): Folder to search in (default: "inbox")
+    - `count` (integer, optional): Number of emails to retrieve (default: 10)
+    - `filter` (string, optional): OData filter query (e.g., "isRead eq false")
+    - `search` (string, optional): Search query for email content
+    
+    **Example**:
+    ```json
+    {
+      "folder": "inbox",
+      "count": 20,
+      "filter": "isRead eq false",
+      "search": "project proposal"
+    }
+    ```
+    
+    **Returns**: List of emails with subject, sender, date, and preview
+  </Accordion>
+
+  <Accordion title="send_email" icon="paper-plane">
+    **Description**: Send an email using Outlook
+    
+    **Parameters**:
+    - `to` (string, required): Recipient email addresses (comma-separated)
+    - `subject` (string, required): Email subject
+    - `body` (string, required): Email body content
+    - `cc` (string, optional): CC email addresses (comma-separated)
+    - `bcc` (string, optional): BCC email addresses (comma-separated)
+    
+    **Example**:
+    ```json
+    {
+      "to": "jane@example.com, john@example.com",
+      "subject": "Project Update",
+      "body": "Hi team,\n\nHere's the latest update on the project...",
+      "cc": "manager@example.com"
+    }
+    ```
+    
+    **Returns**: Confirmation of successful send
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Outlook server provides email resources:
+
+### List Resources
+
+Lists recent emails from your mailbox (10 at a time, ordered by received date).
+
+**URI Format**: `outlook:///{email_id}`
+
+### Read Resource
+
+Reads full email content including:
+- Subject
+- From/To recipients
+- Received date
+- Email body (HTML converted to plain text)
+
+## Usage Examples
+
+### Reading Emails
+
+```python
+# Get unread emails
+emails = await call_tool("read_emails", {
+    "filter": "isRead eq false",
+    "count": 25
+})
+
+# Search for specific emails
+emails = await call_tool("read_emails", {
+    "search": "invoice",
+    "count": 50
+})
+
+# Read from specific folder
+emails = await call_tool("read_emails", {
+    "folder": "sentitems",
+    "count": 10
+})
+```
+
+### Sending Emails
+
+```python
+# Send a simple email
+await call_tool("send_email", {
+    "to": "alice@example.com",
+    "subject": "Meeting Tomorrow",
+    "body": "Hi Alice,\n\nJust a reminder about our meeting tomorrow at 2 PM.\n\nBest regards"
+})
+
+# Send to multiple recipients with CC
+await call_tool("send_email", {
+    "to": "team@example.com, stakeholders@example.com",
+    "subject": "Q1 Results",
+    "body": "Please find attached the Q1 results...",
+    "cc": "manager@example.com",
+    "bcc": "archive@example.com"
+})
+```
+
+## OData Filters
+
+The `filter` parameter supports OData query syntax:
+
+### Common Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `isRead eq false` | Unread emails | Inbox monitoring |
+| `isRead eq true` | Read emails | Processed emails |
+| `hasAttachments eq true` | Has attachments | Find attachments |
+| `importance eq 'high'` | High importance | Priority emails |
+| `receivedDateTime ge {date}` | Received after date | Date range |
+
+### Example Filters
+
+```python
+# Unread emails
+"filter": "isRead eq false"
+
+# High importance emails
+"filter": "importance eq 'high'"
+
+# Emails with attachments
+"filter": "hasAttachments eq true"
+
+# Recent emails (last 7 days)
+"filter": "receivedDateTime ge 2024-01-01T00:00:00Z"
+
+# Combine filters
+"filter": "isRead eq false and hasAttachments eq true"
+```
+
+## Mail Folders
+
+Common folder names:
+
+- `inbox` - Inbox
+- `sentitems` - Sent Items
+- `drafts` - Drafts
+- `deleteditems` - Deleted Items
+
+For custom folders, use the folder ID from the Microsoft Graph API.
+
+## Search Syntax
+
+The `search` parameter searches email content:
+
+```python
+# Search in subject and body
+"search": "quarterly report"
+
+# Search for sender
+"search": "from:john@example.com"
+
+# Multiple terms
+"search": "project AND proposal"
+```
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server outlook --user-id local
+```
+
+## Best Practices
+
+1. **Use filters**: Narrow down results with OData filters
+2. **Pagination**: Retrieve emails in batches with `count` parameter
+3. **Search wisely**: Combine `filter` and `search` for precise results
+4. **Plain text**: Email bodies are converted from HTML to plain text
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `read_emails` | Read emails | Monitor inbox, search emails |
+| `send_email` | Send emails | Automated responses, notifications |
+
+## Email IDs
+
+Email IDs are returned in the response from `read_emails`:
+
+```json
+{
+  "id": "AAMkAGI2T...",
+  "subject": "Project Update",
+  "from": "john@example.com"
+}
+```
+
+Use these IDs to read specific emails via resources.
+
+## Limitations
+
+- Plain text emails only (HTML is converted)
+- No attachment support in current version
+- Search may have slight delays due to indexing
+
+## Related Resources
+
+- [Microsoft Graph API Documentation](https://learn.microsoft.com/en-us/graph/api/overview)
+- [Mail API Reference](https://learn.microsoft.com/en-us/graph/api/resources/mail-api-overview)
+- [OData Query Parameters](https://learn.microsoft.com/en-us/graph/query-parameters)

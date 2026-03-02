@@ -1,0 +1,212 @@
+---
+title: 'Google Docs Server'
+description: 'Create and manage Google Docs documents'
+icon: 'file-lines'
+---
+
+## Overview
+
+The Google Docs server enables AI agents to create, read, and modify Google Docs documents. It provides tools for document creation, content appending, and full document updates.
+
+## Prerequisites
+
+- Python 3.11+
+- A Google Cloud Project with Google Drive and Google Docs APIs enabled
+- OAuth 2.0 credentials with scopes:
+  - `https://www.googleapis.com/auth/drive.file`
+  - `https://www.googleapis.com/auth/documents`
+
+## Authentication
+
+### Setup OAuth Credentials
+
+1. [Create a new Google Cloud project](https://console.cloud.google.com/projectcreate)
+2. [Enable the Google Drive API and Google Docs API](https://console.cloud.google.com/workspace-api/products)
+3. [Configure an OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+4. Add OAuth scopes (see above)
+5. [Create an OAuth Client ID](https://console.cloud.google.com/apis/credentials/oauthclient) for "Desktop App"
+6. Save credentials as `local_auth/oauth_configs/gdocs/oauth.json`
+
+### Authenticate
+
+```bash
+python src/servers/gdocs/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="search_docs" icon="magnifying-glass">
+    **Description**: Search for Google Docs in your Drive
+    
+    **Parameters**:
+    - `query` (string, required): Search query
+    
+    **Example**:
+    ```json
+    {
+      "query": "project proposal"
+    }
+    ```
+    
+    **Returns**: List of matching documents with IDs and metadata
+  </Accordion>
+
+  <Accordion title="create_doc" icon="plus">
+    **Description**: Create a new Google Doc with initial content
+    
+    **Parameters**:
+    - `title` (string, required): Document title
+    - `content` (string, required): Initial document content
+    
+    **Example**:
+    ```json
+    {
+      "title": "Project Proposal",
+      "content": "# Introduction\n\nThis proposal outlines..."
+    }
+    ```
+    
+    **Returns**: Document ID and shareable link
+  </Accordion>
+
+  <Accordion title="append_to_doc" icon="circle-plus">
+    **Description**: Append content to the end of an existing document
+    
+    **Parameters**:
+    - `doc_id` (string, required): Document ID
+    - `content` (string, required): Content to append
+    
+    **Example**:
+    ```json
+    {
+      "doc_id": "abc123xyz789",
+      "content": "\n\n## Additional Section\n\nNew content here..."
+    }
+    ```
+    
+    **Returns**: Confirmation with document link
+  </Accordion>
+
+  <Accordion title="update_doc" icon="pen-to-square">
+    **Description**: Replace all content in a document with new content
+    
+    **Parameters**:
+    - `doc_id` (string, required): Document ID
+    - `content` (string, required): New document content
+    
+    **Example**:
+    ```json
+    {
+      "doc_id": "abc123xyz789",
+      "content": "# Updated Document\n\nCompletely new content..."
+    }
+    ```
+    
+    **Returns**: Confirmation with document link
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Google Docs server provides access to document resources:
+
+### List Resources
+
+Lists Google Docs documents from your Drive (up to 20 at a time).
+
+**URI Format**: `gdocs:///{document_id}`
+
+### Read Resource
+
+Reads the full text content of a document, extracting:
+- Paragraphs
+- Tables
+- Table of contents
+- All text elements
+
+## Usage Examples
+
+### Creating and Editing Documents
+
+```python
+# Create a new document
+result = await call_tool("create_doc", {
+    "title": "Meeting Notes - January 2024",
+    "content": "# Meeting Notes\n\nDate: January 15, 2024\n\n## Attendees\n- Alice\n- Bob\n\n## Agenda\n1. Project updates\n2. Q1 planning"
+})
+
+doc_id = result["id"]
+
+# Append new content
+await call_tool("append_to_doc", {
+    "doc_id": doc_id,
+    "content": "\n\n## Action Items\n- [ ] Review proposal\n- [ ] Schedule follow-up"
+})
+```
+
+### Searching and Reading Documents
+
+```python
+# Search for documents
+docs = await call_tool("search_docs", {
+    "query": "quarterly report 2024"
+})
+
+# Read a document by its URI
+content = await read_resource(f"gdocs:///{docs[0]['id']}")
+print(content)
+```
+
+### Updating Documents
+
+```python
+# Completely replace document content
+await call_tool("update_doc", {
+    "doc_id": "abc123xyz789",
+    "content": "# Updated Report\n\nThis is the revised version of the report..."
+})
+```
+
+## Document ID vs URL
+
+You can extract a document ID from its URL:
+
+**URL**: `https://docs.google.com/document/d/abc123xyz789/edit`
+
+**Document ID**: `abc123xyz789`
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server gdocs --user-id local
+```
+
+## Best Practices
+
+1. **Document structure**: Use markdown-style formatting in content
+2. **Append vs Update**: Use `append_to_doc` to add sections, `update_doc` to rewrite
+3. **Search first**: Use `search_docs` to find existing documents before creating new ones
+4. **Permissions**: Documents are created with your default sharing settings
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `search_docs` | Find documents | Locate existing docs |
+| `create_doc` | Create document | Initialize new docs |
+| `append_to_doc` | Add content | Log entries, add sections |
+| `update_doc` | Replace content | Full rewrites |
+
+## Limitations
+
+- Plain text only (no rich formatting preservation)
+- No image embedding support
+- Tables and complex structures are extracted as text
+
+## Related Resources
+
+- [Google Docs API Documentation](https://developers.google.com/docs/api)
+- [Google Drive API Documentation](https://developers.google.com/drive/api)

@@ -1,0 +1,507 @@
+---
+title: Configuration
+description: Configure guMCP environment variables and server settings
+---
+
+This guide covers all configuration options available in guMCP, including environment variables, server settings, and authentication configuration.
+
+## Environment Variables
+
+guMCP uses environment variables for configuration. These are stored in a `.env` file in the project root.
+
+### Creating Your Configuration File
+
+If you haven't already, create your `.env` file from the template:
+
+```bash
+cp .env.example .env
+```
+
+### Core Configuration
+
+<ParamField path="ENVIRONMENT" type="string" default="local">
+  Sets the runtime environment. Affects logging, error handling, and authentication behavior.
+  
+  - `local` - Development environment with verbose logging
+  - `production` - Production environment with optimized settings
+</ParamField>
+
+<ParamField path="GUMCP_HOST" type="string" default="0.0.0.0">
+  The host address the SSE server binds to.
+  
+  - `0.0.0.0` - Listen on all network interfaces (accessible remotely)
+  - `127.0.0.1` - Listen on localhost only (local access only)
+</ParamField>
+
+<ParamField path="GUMCP_PORT" type="integer" default="8000">
+  The port number the SSE server listens on.
+  
+  ```bash
+  GUMCP_PORT=8000
+  ```
+</ParamField>
+
+### API Keys
+
+<ParamField path="ANTHROPIC_API_KEY" type="string" required>
+  Your Anthropic API key for Claude. Required for running test clients.
+  
+  ```bash
+  ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxx
+  ```
+  
+  Get your API key from [console.anthropic.com](https://console.anthropic.com/)
+</ParamField>
+
+## Server-Specific Configuration
+
+Each MCP server may require additional configuration. Authentication credentials are typically stored separately from the `.env` file.
+
+### API Key-Based Servers
+
+These servers use simple API key authentication:
+
+<AccordionGroup>
+  <Accordion title="Perplexity">
+    The Perplexity server requires an API key from [perplexity.ai](https://www.perplexity.ai/).
+
+    **Setup:**
+    ```bash
+    python src/servers/perplexity/main.py auth
+    ```
+
+    You'll be prompted to enter your API key, which will be stored in:
+    ```
+    local_auth/credentials/perplexity/local_credentials.json
+    ```
+
+    **Features:**
+    - Web search with recency filters
+    - Multiple model support (sonar, sonar-pro, sonar-deep-research)
+    - Code assistance
+    - Related questions retrieval
+  </Accordion>
+</AccordionGroup>
+
+### OAuth 2.0 Servers
+
+These servers require OAuth 2.0 authentication setup:
+
+<AccordionGroup>
+  <Accordion title="Google Services (Sheets, Gmail, Docs, Drive, Calendar)">
+    Google services require a Google Cloud Platform (GCP) project with OAuth 2.0 credentials.
+
+    **Prerequisites:**
+    1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
+    2. Enable the required APIs (Sheets API, Gmail API, etc.)
+    3. Create OAuth 2.0 credentials
+    4. Download the credentials JSON
+
+    **Configuration:**
+    Create a configuration file at:
+    ```
+    local_auth/oauth_configs/gsheets/oauth.json
+    ```
+
+    With the following structure:
+    ```json
+    {
+      "client_id": "your_client_id.apps.googleusercontent.com",
+      "client_secret": "your_client_secret",
+      "redirect_uri": "http://localhost:8080"
+    }
+    ```
+
+    <Note>
+    The default redirect URI `http://localhost:8080` is recommended as it matches the OAuth utility in `src/utils/oauth/util.py`.
+    </Note>
+
+    **Supported Services:**
+    - **Google Sheets** (`gsheets`) - Read and write spreadsheet data
+    - **Gmail** (`gmail`) - Send and read emails
+    - **Google Docs** (`gdocs`) - Create and edit documents
+    - **Google Drive** (`gdrive`) - Manage files and folders
+    - **Google Calendar** (`gcalendar`) - Manage events and calendars
+
+    **Alternative:** Use [Gumloop's hosted MCP](https://www.gumloop.com/mcp) for seamless OAuth without local setup.
+  </Accordion>
+
+  <Accordion title="Slack">
+    Slack uses OAuth 2.0 without refresh tokens.
+
+    **Prerequisites:**
+    1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps)
+    2. Configure OAuth & Permissions
+    3. Add required scopes
+    4. Install the app to your workspace
+
+    **Configuration:**
+    ```
+    local_auth/oauth_configs/slack/oauth.json
+    ```
+
+    ```json
+    {
+      "client_id": "your_slack_client_id",
+      "client_secret": "your_slack_client_secret",
+      "redirect_uri": "http://localhost:8080"
+    }
+    ```
+
+    <Warning>
+    Local OAuth setup requires an HTTPS redirect URI for production. Use ngrok or similar for local development with real Slack workspaces.
+    </Warning>
+
+    **Reference Implementation:** See `src/utils/slack/util.py`
+  </Accordion>
+
+  <Accordion title="Outlook">
+    Outlook requires Azure app registration.
+
+    **Prerequisites:**
+    1. Register an app in [Azure Portal](https://portal.azure.com/)
+    2. Configure Microsoft Graph API permissions
+    3. Add redirect URI
+    4. Generate client secret
+
+    **Configuration:**
+    ```
+    local_auth/oauth_configs/outlook/oauth.json
+    ```
+
+    ```json
+    {
+      "client_id": "your_azure_client_id",
+      "client_secret": "your_azure_client_secret",
+      "redirect_uri": "http://localhost:8080"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Airtable">
+    Airtable uses OAuth 2.0 with refresh tokens and PKCE (Proof Key for Code Exchange).
+
+    **Prerequisites:**
+    1. Create an Airtable OAuth integration at [airtable.com/create/oauth](https://airtable.com/create/oauth)
+    2. Configure redirect URI
+    3. Note your client ID and client secret
+
+    **Configuration:**
+    ```
+    local_auth/oauth_configs/airtable/oauth.json
+    ```
+
+    ```json
+    {
+      "client_id": "your_airtable_client_id",
+      "client_secret": "your_airtable_client_secret",
+      "redirect_uri": "http://localhost:8080"
+    }
+    ```
+
+    **Reference Implementation:** See `src/utils/airtable/util.py` for PKCE flow example
+  </Accordion>
+
+  <Accordion title="Linear">
+    Linear uses OAuth 2.0 for project management integration.
+
+    **Prerequisites:**
+    1. Create an OAuth application in Linear settings
+    2. Configure redirect URI
+    3. Note your client ID and client secret
+
+    **Configuration:**
+    ```
+    local_auth/oauth_configs/linear/oauth.json
+    ```
+
+    ```json
+    {
+      "client_id": "your_linear_client_id",
+      "client_secret": "your_linear_client_secret",
+      "redirect_uri": "http://localhost:8080"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Attio">
+    Attio CRM uses OAuth 2.0 with refresh tokens and additional token response parameters.
+
+    **Prerequisites:**
+    1. Create an Attio OAuth application
+    2. Configure redirect URI
+    3. Note your client ID and client secret
+
+    **Configuration:**
+    ```
+    local_auth/oauth_configs/attio/oauth.json
+    ```
+
+    ```json
+    {
+      "client_id": "your_attio_client_id",
+      "client_secret": "your_attio_client_secret",
+      "redirect_uri": "http://localhost:8080"
+    }
+    ```
+
+    **Reference Implementation:** See `src/utils/attio/util.py` for handling additional token parameters
+  </Accordion>
+</AccordionGroup>
+
+## File Structure
+
+understanding where configuration and credentials are stored:
+
+```
+guMCP/
+├── .env                          # Main environment variables
+├── .env.example                  # Environment template
+├── local_auth/
+│   ├── credentials/              # Stored user credentials
+│   │   ├── perplexity/
+│   │   │   └── local_credentials.json
+│   │   ├── gsheets/
+│   │   │   └── local_credentials.json
+│   │   └── slack/
+│   │       └── local_credentials.json
+│   └── oauth_configs/            # OAuth application configs
+│       ├── gsheets/
+│       │   └── oauth.json
+│       ├── slack/
+│       │   └── oauth.json
+│       └── airtable/
+│           └── oauth.json
+└── src/
+    └── servers/
+        └── {server-name}/
+            └── README.md         # Server-specific docs
+```
+
+<Warning>
+Never commit the `local_auth/` directory or `.env` file to version control. These contain sensitive credentials.
+</Warning>
+
+## Server Startup Configuration
+
+The `start_sse_dev_server.sh` script handles server startup with the following behavior:
+
+<Steps>
+  <Step title="Load environment variables">
+    Loads all variables from `.env` if the file exists
+  </Step>
+
+  <Step title="Set defaults">
+    Sets default values for `GUMCP_HOST` (0.0.0.0) and `GUMCP_PORT` (8000) if not configured
+  </Step>
+
+  <Step title="Kill existing process">
+    Checks if any process is using the configured port and kills it
+  </Step>
+
+  <Step title="Start server">
+    Launches the main server: `python src/servers/main.py`
+  </Step>
+</Steps>
+
+### Manual Server Startup
+
+You can also start the server manually with custom arguments:
+
+```bash
+python src/servers/main.py --host 127.0.0.1 --port 3000
+```
+
+<ParamField path="--host" type="string" default="0.0.0.0">
+  Server host address
+</ParamField>
+
+<ParamField path="--port" type="integer" default="8000">
+  Server port number
+</ParamField>
+
+## Production Configuration
+
+For production deployments, consider these additional configurations:
+
+### Environment Settings
+
+```bash .env
+# Production environment
+ENVIRONMENT=production
+
+# Restrict to localhost if behind reverse proxy
+GUMCP_HOST=127.0.0.1
+GUMCP_PORT=8000
+
+# Required: Anthropic API key
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxx
+```
+
+### Reverse Proxy
+
+When running behind nginx or another reverse proxy:
+
+```nginx nginx.conf
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Process Management
+
+Use a process manager to keep guMCP running:
+
+<CodeGroup>
+```ini systemd
+[Unit]
+Description=guMCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=youruser
+WorkingDirectory=/path/to/guMCP
+Environment="PATH=/path/to/guMCP/venv/bin"
+ExecStart=/path/to/guMCP/venv/bin/python src/servers/main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```yaml PM2
+# ecosystem.config.js
+module.exports = {
+  apps: [{
+    name: 'gumcp',
+    script: 'src/servers/main.py',
+    interpreter: 'venv/bin/python',
+    cwd: '/path/to/guMCP',
+    env: {
+      ENVIRONMENT: 'production',
+      GUMCP_HOST: '127.0.0.1',
+      GUMCP_PORT: '8000'
+    },
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G'
+  }]
+}
+```
+</CodeGroup>
+
+## Security Best Practices
+
+<Warning>
+guMCP handles sensitive credentials and API access. Follow these security practices:
+</Warning>
+
+1. **Never commit credentials** - Add `local_auth/` and `.env` to `.gitignore`
+2. **Use environment-specific keys** - Separate keys for development and production
+3. **Restrict access** - Use `GUMCP_HOST=127.0.0.1` when behind a reverse proxy
+4. **Enable HTTPS** - Always use HTTPS in production with valid SSL certificates
+5. **Rotate keys regularly** - Update API keys and OAuth secrets periodically
+6. **Monitor access** - Log and monitor API usage for unusual activity
+7. **Limit OAuth scopes** - Only request necessary permissions for OAuth apps
+
+<Info>
+Gumloop is SOC 2 Type II, GDPR, and HIPAA compliant. For production deployments requiring compliance, consider using [Gumloop's hosted MCP servers](https://www.gumloop.com/mcp).
+</Info>
+
+## Authentication Reference
+
+For developers implementing new servers or custom authentication:
+
+### OAuth 2.0 Implementation
+
+Reference implementations for different OAuth patterns:
+
+- **Simple OAuth (no refresh)**: `src/utils/slack/util.py`
+- **OAuth with refresh tokens**: `src/utils/attio/util.py`
+- **OAuth with PKCE**: `src/utils/airtable/util.py`
+
+### API Key Implementation
+
+Reference implementation: `src/servers/perplexity/main.py`
+
+### Custom Auth Client
+
+If implementing a custom `AuthClient` for remote hosting:
+
+1. Extend `BaseAuthClient` from `src/auth/clients/BaseAuthClient.py`
+2. Implement `get_user_credentials()` to return refreshed credentials
+3. Handle token refresh internally within your client
+
+See [CONTRIBUTING.MD](https://github.com/gumloop/guMCP/blob/main/CONTRIBUTING.MD) for detailed authentication implementation guidelines.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Environment variables not loading">
+    Ensure:
+    1. `.env` file exists in project root
+    2. File is properly formatted (no spaces around `=`)
+    3. No quotes needed around values
+    4. File is not named `.env.txt` or `.env.example`
+
+    Test loading:
+    ```bash
+    source .env && echo $ANTHROPIC_API_KEY
+    ```
+  </Accordion>
+
+  <Accordion title="OAuth authentication failing">
+    Common issues:
+    1. **Redirect URI mismatch** - Must match exactly in OAuth config and provider settings
+    2. **Missing scopes** - Ensure all required scopes are configured
+    3. **Expired credentials** - Delete old credentials and re-authenticate
+    4. **Localhost vs 127.0.0.1** - Some providers are strict about localhost vs IP
+    5. **HTTPS required** - Production OAuth may require HTTPS redirect URIs
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    The startup script automatically kills processes on the configured port. If issues persist:
+
+    ```bash
+    # Manually kill process on port 8000
+    lsof -ti :8000 | xargs kill -9
+
+    # Or use a different port
+    GUMCP_PORT=3000 ./start_sse_dev_server.sh
+    ```
+  </Accordion>
+
+  <Accordion title="Credentials not persisting">
+    Check:
+    1. `local_auth/` directory exists and is writable
+    2. Server-specific subdirectories exist (e.g., `local_auth/credentials/perplexity/`)
+    3. No file permission issues
+    4. Authentication command completed successfully
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Server Documentation" icon="book" href="https://github.com/gumloop/guMCP/tree/main/src/servers">
+    Explore individual server documentation and capabilities
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="https://github.com/gumloop/guMCP/blob/main/CONTRIBUTING.MD">
+    Learn how to implement new servers and auth methods
+  </Card>
+</CardGroup>

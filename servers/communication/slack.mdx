@@ -1,0 +1,307 @@
+---
+title: 'Slack Server'
+description: 'Interact with Slack channels and messages'
+icon: 'slack'
+---
+
+## Overview
+
+The Slack server enables AI agents to read and send messages in Slack channels, create rich canvas messages, and interact with Slack workspaces.
+
+## Prerequisites
+
+- Python 3.11+
+- A Slack App with the following OAuth scopes:
+  - `channels:history`
+  - `channels:read`
+  - `chat:write`
+  - `chat:write.customize`
+  - `users:read`
+
+## Authentication
+
+### Create a Slack App
+
+1. [Create a Slack App](https://api.slack.com/quickstart#creating)
+2. Add the required OAuth scopes (see above)
+3. Install the app to your workspace
+4. Note your Client ID, Client Secret, and Redirect URI
+
+### Setup OAuth Configuration
+
+Create `local_auth/oauth_configs/slack/oauth.json`:
+
+```json
+{
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "redirect_uri": "https://your-redirect-uri"
+}
+```
+
+**Note**: Slack requires HTTPS for redirect URIs. For local development, use [ngrok](https://ngrok.com/) to create a tunnel to port 8080.
+
+### Authenticate
+
+```bash
+python src/servers/slack/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="read_messages" icon="message">
+    **Description**: Read messages from a Slack channel
+    
+    **Parameters**:
+    - `channel` (string, required): Slack channel ID or name (with # for names)
+    - `limit` (integer, optional): Maximum number of messages to return (default: 20)
+    
+    **Example**:
+    ```json
+    {
+      "channel": "#general",
+      "limit": 50
+    }
+    ```
+    
+    **Returns**: List of messages in chronological order with timestamps and users
+  </Accordion>
+
+  <Accordion title="send_message" icon="paper-plane">
+    **Description**: Send a message to a Slack channel or user
+    
+    **Parameters**:
+    - `channel` (string, required): Channel ID or name (# for channels, @ for users)
+    - `text` (string, required): Message text to send
+    - `thread_ts` (string, optional): Thread timestamp to reply to a thread
+    
+    **Example**:
+    ```json
+    {
+      "channel": "#team-updates",
+      "text": "Deployment completed successfully! :rocket:",
+      "thread_ts": "1234567890.123456"
+    }
+    ```
+    
+    **Returns**: Confirmation with message timestamp
+  </Accordion>
+
+  <Accordion title="create_canvas" icon="paintbrush">
+    **Description**: Create a Slack canvas message with rich Block Kit content
+    
+    **Parameters**:
+    - `channel` (string, required): Channel ID or name (with # for names)
+    - `title` (string, required): Canvas title
+    - `blocks` (array, required): Array of Slack Block Kit elements
+    - `thread_ts` (string, optional): Thread timestamp to attach canvas to thread
+    
+    **Example**:
+    ```json
+    {
+      "channel": "#announcements",
+      "title": "Weekly Report",
+      "blocks": [
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*This week's highlights:*"
+          }
+        },
+        {
+          "type": "divider"
+        },
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "\u2022 Completed 15 tasks\n\u2022 Resolved 8 bugs"
+          }
+        }
+      ]
+    }
+    ```
+    
+    **Returns**: Confirmation with message timestamp
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Slack server provides access to channel resources:
+
+### List Resources
+
+Lists all accessible Slack channels (public and private) up to 100 at a time.
+
+**URI Format**: 
+- `slack://channel/{channel_id}` - Public channels
+- `slack://private/{channel_id}` - Private channels
+
+### Read Resource
+
+Reads the last 50 messages from a channel with:
+- Message text
+- User information
+- Timestamps
+- Attachments
+
+## Usage Examples
+
+### Reading Messages
+
+```python
+# Read recent messages from a channel
+messages = await call_tool("read_messages", {
+    "channel": "#general",
+    "limit": 30
+})
+
+# Read messages using channel ID
+messages = await call_tool("read_messages", {
+    "channel": "C01234ABCDE",
+    "limit": 100
+})
+```
+
+### Sending Messages
+
+```python
+# Send a simple message
+await call_tool("send_message", {
+    "channel": "#team-updates",
+    "text": "Meeting starts in 10 minutes!"
+})
+
+# Send a DM to a user
+await call_tool("send_message", {
+    "channel": "@john.doe",
+    "text": "Hi John, can you review the PR?"
+})
+
+# Reply to a thread
+await call_tool("send_message", {
+    "channel": "#development",
+    "text": "Fix deployed!",
+    "thread_ts": "1234567890.123456"
+})
+```
+
+### Creating Rich Canvas Messages
+
+```python
+# Create a formatted announcement
+await call_tool("create_canvas", {
+    "channel": "#announcements",
+    "title": "Product Launch",
+    "blocks": [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "New Feature Released!"
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Version 2.0* is now live with:\n\u2022 Dark mode\n\u2022 Performance improvements\n\u2022 New dashboard"
+            }
+        },
+        {
+            "type": "divider"
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "<https://docs.example.com|View Documentation>"
+            }
+        }
+    ]
+})
+```
+
+## Channel Identifiers
+
+The Slack server supports multiple ways to identify channels:
+
+### Channel Names
+```python
+"channel": "#general"        # Public channel
+"channel": "#team-updates"   # Another public channel
+```
+
+### User Names (for DMs)
+```python
+"channel": "@john.doe"       # Direct message to user
+"channel": "@jane.smith"     # Another user
+```
+
+### Channel IDs
+```python
+"channel": "C01234ABCDE"     # Direct channel ID
+```
+
+## Slack Block Kit
+
+The `create_canvas` tool uses [Slack Block Kit](https://api.slack.com/block-kit) for rich formatting:
+
+### Common Block Types
+
+| Block Type | Description | Use Case |
+|------------|-------------|----------|
+| `header` | Large header text | Titles, headings |
+| `section` | Text section with markdown | Body content |
+| `divider` | Horizontal rule | Separate sections |
+| `image` | Display images | Visual content |
+| `actions` | Interactive buttons | User actions |
+| `context` | Muted text | Metadata, timestamps |
+
+### Markdown Support
+
+Use `mrkdwn` text type for formatting:
+- `*bold*`
+- `_italic_`
+- `~strikethrough~`
+- `` `code` ``
+- `<url|link text>`
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server slack --user-id local
+```
+
+## Best Practices
+
+1. **Use channel names**: Easier to read than IDs (e.g., `#general` vs `C01234ABCDE`)
+2. **Thread replies**: Use `thread_ts` to keep conversations organized
+3. **Rich formatting**: Use Block Kit for important announcements
+4. **Rate limits**: Be mindful of Slack API rate limits
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `read_messages` | Read channel messages | Monitor channels, search history |
+| `send_message` | Send messages | Notifications, replies, DMs |
+| `create_canvas` | Rich messages | Announcements, reports, dashboards |
+
+## Thread Timestamps
+
+Slack uses timestamps as thread identifiers. Get `thread_ts` from:
+- Response when sending a message
+- Message metadata when reading messages
+- Format: `"1234567890.123456"` (Unix timestamp with microseconds)
+
+## Related Resources
+
+- [Slack API Documentation](https://api.slack.com/docs)
+- [Slack Block Kit Builder](https://app.slack.com/block-kit-builder)
+- [OAuth Scopes Reference](https://api.slack.com/scopes)

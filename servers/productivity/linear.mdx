@@ -1,0 +1,274 @@
+---
+title: 'Linear Server'
+description: 'Manage issues and projects in Linear'
+icon: 'diagram-project'
+---
+
+## Overview
+
+The Linear server enables AI agents to search, create, and update issues in Linear. It provides comprehensive issue tracking and project management capabilities.
+
+## Prerequisites
+
+- Python 3.11+
+- A Linear App with OAuth configured
+- OAuth scopes: `read`, `write`
+
+## Authentication
+
+### Create Linear OAuth App
+
+1. Follow the [Linear OAuth Authentication guide](https://developers.linear.app/docs/oauth/authentication)
+2. Create an OAuth application
+3. Note your Client ID, Client Secret, and Redirect URI
+
+### Setup OAuth Configuration
+
+Create `local_auth/oauth_configs/linear/oauth.json`:
+
+```json
+{
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "redirect_uri": "your_redirect_uri"
+}
+```
+
+### Authenticate
+
+```bash
+python src/servers/linear/main.py auth
+```
+
+## Available Tools
+
+<AccordionGroup>
+  <Accordion title="search_issues" icon="magnifying-glass">
+    **Description**: Search for issues in Linear
+    
+    **Parameters**:
+    - `query` (string, required): Search query for issues
+    
+    **Example**:
+    ```json
+    {
+      "query": "authentication bug"
+    }
+    ```
+    
+    **Returns**: List of matching issues with details (title, state, priority, assignee)
+  </Accordion>
+
+  <Accordion title="create_issue" icon="plus">
+    **Description**: Create a new issue in Linear
+    
+    **Parameters**:
+    - `team_id` (string, required): ID of the team
+    - `title` (string, required): Issue title
+    - `description` (string, optional): Issue description
+    - `priority` (integer, optional): Priority (1-4, where 1 is highest)
+    - `assignee_id` (string, optional): ID of user to assign
+    - `label_ids` (array, optional): Array of label IDs to apply
+    
+    **Example**:
+    ```json
+    {
+      "team_id": "team_abc123",
+      "title": "Fix login authentication error",
+      "description": "Users are unable to login with Google OAuth",
+      "priority": 1,
+      "assignee_id": "user_xyz789"
+    }
+    ```
+    
+    **Returns**: Created issue details with ID and URL
+  </Accordion>
+
+  <Accordion title="update_issue" icon="pen-to-square">
+    **Description**: Update an existing issue in Linear
+    
+    **Parameters**:
+    - `issue_id` (string, required): ID of the issue to update
+    - `title` (string, optional): New title
+    - `description` (string, optional): New description
+    - `state_id` (string, optional): New state ID
+    - `priority` (integer, optional): New priority (1-4)
+    - `assignee_id` (string, optional): New assignee ID
+    - `label_ids` (array, optional): New label IDs
+    
+    **Example**:
+    ```json
+    {
+      "issue_id": "issue_123abc",
+      "state_id": "state_completed",
+      "priority": 3
+    }
+    ```
+    
+    **Returns**: Updated issue details
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+The Linear server provides access to teams and issues:
+
+### List Resources
+
+Lists:
+- All your teams
+- Recent issues from each team (up to 10 per team)
+
+**URI Formats**: 
+- `linear:///team/{team_id}` - Team details
+- `linear:///issue/{issue_id}` - Issue details
+
+### Read Resource
+
+Reads complete details including:
+- Issue metadata (title, identifier, state)
+- Team information
+- Assignee details
+- Labels and priority
+- Comments with timestamps
+
+## Usage Examples
+
+### Searching Issues
+
+```python
+# Search by keyword
+issues = await call_tool("search_issues", {
+    "query": "authentication"
+})
+
+# Search for bugs
+issues = await call_tool("search_issues", {
+    "query": "bug"
+})
+```
+
+### Creating Issues
+
+```python
+# Create a simple issue
+await call_tool("create_issue", {
+    "team_id": "team_abc123",
+    "title": "Add dark mode support",
+    "description": "Users have requested a dark mode option for the dashboard"
+})
+
+# Create a high-priority bug with assignment
+await call_tool("create_issue", {
+    "team_id": "team_abc123",
+    "title": "Critical: Database connection failing",
+    "description": "Production database connections are timing out",
+    "priority": 1,
+    "assignee_id": "user_xyz789",
+    "label_ids": ["label_bug", "label_critical"]
+})
+```
+
+### Updating Issues
+
+```python
+# Mark issue as completed
+await call_tool("update_issue", {
+    "issue_id": "issue_123abc",
+    "state_id": "state_completed"
+})
+
+# Reassign and change priority
+await call_tool("update_issue", {
+    "issue_id": "issue_123abc",
+    "assignee_id": "user_xyz789",
+    "priority": 2
+})
+
+# Update title and description
+await call_tool("update_issue", {
+    "issue_id": "issue_123abc",
+    "title": "[Updated] Fix login authentication",
+    "description": "Updated description with more details..."
+})
+```
+
+## Priority Levels
+
+Linear uses numeric priorities:
+
+| Priority | Value | Usage |
+|----------|-------|-------|
+| Urgent | 1 | Critical issues requiring immediate attention |
+| High | 2 | Important issues to address soon |
+| Medium | 3 | Standard priority issues |
+| Low | 4 | Nice-to-have improvements |
+| None | null | No priority set |
+
+## Finding IDs
+
+### Team ID
+
+Use `list_resources()` to discover team IDs:
+
+```python
+resources = await list_resources()
+for resource in resources:
+    if "Team:" in resource.name:
+        print(f"Team: {resource.name}, URI: {resource.uri}")
+        # Extract team_id from URI: linear:///team/{team_id}
+```
+
+### Issue ID
+
+Returned when creating an issue or from search results.
+
+### State ID
+
+Read a team resource to see available states:
+
+```python
+team_data = await read_resource("linear:///team/{team_id}")
+# Contains states.nodes with state IDs and names
+```
+
+## Issue Identifiers
+
+Linear uses human-readable identifiers like `ENG-123`:
+- `ENG` - Team key
+- `123` - Issue number
+
+These are different from issue IDs used by the API.
+
+## Running the Server
+
+### Local Development
+
+```bash
+python src/servers/local.py --server linear --user-id local
+```
+
+## Best Practices
+
+1. **Use descriptive titles**: Clear, concise issue titles
+2. **Set priorities**: Help teams prioritize work
+3. **Assign ownership**: Use `assignee_id` for accountability
+4. **Add labels**: Categorize issues with labels
+5. **Search first**: Check for duplicates before creating issues
+
+## API Reference
+
+| Tool | Purpose | Common Use Cases |
+|------|---------|------------------|
+| `search_issues` | Find issues | Search bugs, find tasks |
+| `create_issue` | Create issues | Report bugs, create tasks |
+| `update_issue` | Modify issues | Update status, reassign |
+
+## GraphQL API
+
+Linear uses GraphQL. The server handles query construction, but you can reference the [Linear API docs](https://developers.linear.app/docs/graphql/working-with-the-graphql-api) for advanced use cases.
+
+## Related Resources
+
+- [Linear API Documentation](https://developers.linear.app/docs)
+- [Linear GraphQL Schema](https://studio.apollographql.com/public/Linear-API/home)

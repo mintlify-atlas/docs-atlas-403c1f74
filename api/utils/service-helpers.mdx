@@ -1,0 +1,384 @@
+---
+title: "Service Helper Utilities"
+description: "Service-specific authentication and credential helpers"
+---
+
+## Overview
+
+Service helper utilities provide service-specific implementations for OAuth flows and credential management. Each service (Google, Slack, etc.) has its own helper module with tailored authentication logic.
+
+**Source:** `src/utils/{service}/util.py`
+
+## Google Utilities
+
+**Source:** `src/utils/google/util.py`
+
+Google services (Drive, Docs, Sheets, Gmail) use the Google OAuth 2.0 library.
+
+### authenticate_and_save_credentials
+
+Authenticate with Google and save credentials.
+
+**Source:** `src/utils/google/util.py:10`
+
+```python
+def authenticate_and_save_credentials(user_id, service_name, scopes):
+```
+
+<ParamField path="user_id" type="str" required>
+  User identifier
+</ParamField>
+
+<ParamField path="service_name" type="str" required>
+  Name of the Google service (e.g., "gdrive", "gmail")
+</ParamField>
+
+<ParamField path="scopes" type="List[str]" required>
+  List of Google API scopes
+</ParamField>
+
+<ResponseField name="return" type="Credentials">
+  Google OAuth2 Credentials object
+</ResponseField>
+
+**Example:**
+
+```python
+from src.utils.google.util import authenticate_and_save_credentials
+
+scopes = [
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/documents.readonly",
+]
+
+creds = authenticate_and_save_credentials(
+    user_id="user123",
+    service_name="gdrive",
+    scopes=scopes
+)
+```
+
+### get_credentials
+
+Get credentials for the specified user.
+
+**Source:** `src/utils/google/util.py:37`
+
+```python
+async def get_credentials(user_id, service_name, api_key=None):
+```
+
+<ParamField path="user_id" type="str" required>
+  User identifier
+</ParamField>
+
+<ParamField path="service_name" type="str" required>
+  Name of the Google service
+</ParamField>
+
+<ParamField path="api_key" type="Optional[str]">
+  Optional API key for Gumloop auth client
+</ParamField>
+
+<ResponseField name="return" type="Credentials">
+  Google OAuth2 Credentials object
+</ResponseField>
+
+**Example:**
+
+```python
+from src.utils.google.util import get_credentials
+from googleapiclient.discovery import build
+
+creds = await get_credentials("user123", "gdrive")
+service = build("drive", "v3", credentials=creds)
+```
+
+## Slack Utilities
+
+**Source:** `src/utils/slack/util.py`
+
+Slack uses OAuth 2.0 with the generic OAuth utilities.
+
+### Constants
+
+```python
+SLACK_OAUTH_AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize"
+SLACK_OAUTH_TOKEN_URL = "https://slack.com/api/oauth.v2.access"
+```
+
+### authenticate_and_save_credentials
+
+Authenticate with Slack and save credentials.
+
+**Source:** `src/utils/slack/util.py:56`
+
+```python
+def authenticate_and_save_credentials(
+    user_id: str, service_name: str, scopes: List[str]
+) -> Dict[str, Any]:
+```
+
+<ParamField path="user_id" type="str" required>
+  User identifier
+</ParamField>
+
+<ParamField path="service_name" type="str" required>
+  Name of the service (typically "slack")
+</ParamField>
+
+<ParamField path="scopes" type="List[str]" required>
+  List of Slack OAuth scopes
+</ParamField>
+
+<ResponseField name="return" type="Dict[str, Any]">
+  Dictionary containing access_token, token_type, scope, team_id, and team_name
+</ResponseField>
+
+**Example:**
+
+```python
+from src.utils.slack.util import authenticate_and_save_credentials
+
+scopes = [
+    "channels:read",
+    "chat:write",
+    "users:read",
+]
+
+creds = authenticate_and_save_credentials(
+    user_id="user123",
+    service_name="slack",
+    scopes=scopes
+)
+```
+
+### get_credentials
+
+Get Slack credentials.
+
+**Source:** `src/utils/slack/util.py:72`
+
+```python
+async def get_credentials(user_id: str, service_name: str, api_key: str = None) -> str:
+```
+
+<ParamField path="user_id" type="str" required>
+  User identifier
+</ParamField>
+
+<ParamField path="service_name" type="str" required>
+  Name of the service
+</ParamField>
+
+<ParamField path="api_key" type="Optional[str]">
+  Optional API key for Gumloop auth client
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Slack access token
+</ResponseField>
+
+**Note:** Slack tokens don't expire, so no refresh is performed.
+
+**Example:**
+
+```python
+from src.utils.slack.util import get_credentials
+from slack_sdk import WebClient
+
+token = await get_credentials("user123", "slack")
+client = WebClient(token=token)
+```
+
+### Helper Functions
+
+These functions are used internally by `run_oauth_flow`:
+
+#### build_slack_auth_params
+
+**Source:** `src/utils/slack/util.py:13`
+
+```python
+def build_slack_auth_params(
+    oauth_config: Dict[str, Any], redirect_uri: str, scopes: List[str]
+) -> Dict[str, str]:
+```
+
+Builds authorization parameters for Slack OAuth.
+
+#### build_slack_token_data
+
+**Source:** `src/utils/slack/util.py:24`
+
+```python
+def build_slack_token_data(
+    oauth_config: Dict[str, Any], redirect_uri: str, scopes: List[str], auth_code: str
+) -> Dict[str, str]:
+```
+
+Builds token request data for Slack OAuth.
+
+#### process_slack_token_response
+
+**Source:** `src/utils/slack/util.py:36`
+
+```python
+def process_slack_token_response(token_response: Dict[str, Any]) -> Dict[str, Any]:
+```
+
+Processes Slack token response, extracting and preparing credentials.
+
+## Common Patterns
+
+### Authentication Flow
+
+All service helpers follow a similar pattern:
+
+```python
+# 1. Define service-specific OAuth URLs
+AUTH_URL = "https://service.com/oauth/authorize"
+TOKEN_URL = "https://service.com/oauth/token"
+
+# 2. Implement builder functions
+def build_auth_params(oauth_config, redirect_uri, scopes):
+    # Build authorization parameters
+    pass
+
+def build_token_data(oauth_config, redirect_uri, scopes, auth_code):
+    # Build token request data
+    pass
+
+def process_token_response(token_response):
+    # Process and normalize token response
+    pass
+
+# 3. Use run_oauth_flow
+from src.utils.oauth.util import run_oauth_flow
+
+def authenticate_and_save_credentials(user_id, service_name, scopes):
+    return run_oauth_flow(
+        service_name=service_name,
+        user_id=user_id,
+        scopes=scopes,
+        auth_url_base=AUTH_URL,
+        token_url=TOKEN_URL,
+        auth_params_builder=build_auth_params,
+        token_data_builder=build_token_data,
+        process_token_response=process_token_response,
+    )
+
+# 4. Implement get_credentials
+async def get_credentials(user_id, service_name, api_key=None):
+    return await refresh_token_if_needed(
+        user_id=user_id,
+        service_name=service_name,
+        token_url=TOKEN_URL,
+        token_data_builder=build_refresh_data,
+        api_key=api_key,
+    )
+```
+
+### Credential Retrieval
+
+Services typically provide a `get_credentials` function:
+
+```python
+# Returns string (access token)
+access_token = await get_credentials(user_id, service_name)
+
+# Or returns full credentials object
+creds = await get_credentials(user_id, service_name)
+```
+
+## Available Services
+
+The following service utilities are available:
+
+- `src/utils/google/util.py` - Google services (Drive, Docs, Sheets, Gmail)
+- `src/utils/slack/util.py` - Slack
+- `src/utils/microsoft/util.py` - Microsoft services (Outlook, OneDrive, Teams)
+- `src/utils/github/util.py` - GitHub
+- `src/utils/linear/util.py` - Linear
+- `src/utils/hubspot/util.py` - HubSpot
+- `src/utils/airtable/util.py` - Airtable
+- `src/utils/attio/util.py` - Attio
+- `src/utils/quickbooks/util.py` - QuickBooks
+- `src/utils/typeform/util.py` - Typeform
+
+## Creating New Service Helpers
+
+To add a new service:
+
+1. Create `src/utils/myservice/util.py`
+2. Define OAuth URLs
+3. Implement builder functions
+4. Use `run_oauth_flow` for authentication
+5. Use `refresh_token_if_needed` for credential retrieval
+
+**Example template:**
+
+```python
+import logging
+from typing import Dict, List, Any
+
+from src.utils.oauth.util import run_oauth_flow, refresh_token_if_needed
+
+AUTH_URL = "https://myservice.com/oauth/authorize"
+TOKEN_URL = "https://myservice.com/oauth/token"
+
+logger = logging.getLogger(__name__)
+
+def build_auth_params(oauth_config, redirect_uri, scopes):
+    return {
+        "client_id": oauth_config["client_id"],
+        "redirect_uri": redirect_uri,
+        "scope": " ".join(scopes),
+        "response_type": "code",
+    }
+
+def build_token_data(oauth_config, redirect_uri, scopes, auth_code):
+    return {
+        "client_id": oauth_config["client_id"],
+        "client_secret": oauth_config["client_secret"],
+        "code": auth_code,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+
+def build_refresh_data(oauth_config, refresh_token, credentials_data):
+    return {
+        "client_id": oauth_config["client_id"],
+        "client_secret": oauth_config["client_secret"],
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token",
+    }
+
+def authenticate_and_save_credentials(
+    user_id: str, service_name: str, scopes: List[str]
+) -> Dict[str, Any]:
+    return run_oauth_flow(
+        service_name=service_name,
+        user_id=user_id,
+        scopes=scopes,
+        auth_url_base=AUTH_URL,
+        token_url=TOKEN_URL,
+        auth_params_builder=build_auth_params,
+        token_data_builder=build_token_data,
+    )
+
+async def get_credentials(user_id: str, service_name: str, api_key: str = None) -> str:
+    return await refresh_token_if_needed(
+        user_id=user_id,
+        service_name=service_name,
+        token_url=TOKEN_URL,
+        token_data_builder=build_refresh_data,
+        api_key=api_key,
+    )
+```
+
+## See Also
+
+- [OAuth Utilities](/api/utils/oauth) - Generic OAuth flow handlers
+- [BaseAuthClient](/api/auth/base-client) - Authentication client interface
+- [create_auth_client()](/api/auth/factory) - Auth client factory

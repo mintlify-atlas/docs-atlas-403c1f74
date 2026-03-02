@@ -1,0 +1,253 @@
+---
+title: Attio CRM
+description: Interact with Attio CRM data and records
+---
+
+The Attio server provides comprehensive access to your Attio CRM, enabling you to manage companies, contacts, and lists through the MCP protocol.
+
+## Authentication
+
+This server uses OAuth 2.0 authentication. You'll need:
+
+- An Attio account and API access
+- An Attio OAuth App key with appropriate permissions:
+  - Reading companies and contacts
+  - Writing companies and contacts
+  - Managing lists
+
+Refer to the [Attio API documentation](https://developers.attio.com/docs/integrations) for setup instructions.
+
+### Local Setup
+
+Create `local_auth/oauth_configs/attio/oauth.json`:
+
+```json
+{
+  "client_id": "xxxxxxxxxxxxxxxxxxxxx",
+  "client_secret": "xxxxxxxxxxxxxxxxxxxxx",
+  "redirect_uri": "http://xxxxxxxxxxxxx"
+}
+```
+
+Run authentication:
+
+```bash
+python src/servers/attio/main.py auth
+```
+
+## Resources
+
+The server exposes these resources:
+
+| URI | Description |
+|-----|-------------|
+| `attio:///collections/companies` | Companies collection (up to 50 records) |
+| `attio:///collections/people` | People/contacts collection (up to 50 records) |
+| `attio:///lists/{list_id}` | Records from a specific list |
+
+## Tools
+
+### Company Management
+
+<Accordion title="search_companies">
+Search for companies in Attio by name.
+
+**Parameters:**
+- `query` (string, required): Search query to match company names
+
+**Example:**
+```json
+{
+  "query": "Acme Corp"
+}
+```
+
+**Implementation:** Uses Attio's query API with a `$contains` filter on the name field. Returns up to 50 matching companies.
+</Accordion>
+
+<Accordion title="read_company">
+Retrieve detailed information about a specific company.
+
+**Parameters:**
+- `id` (string, required): Company ID
+
+**Example:**
+```json
+{
+  "id": "comp_123abc"
+}
+```
+</Accordion>
+
+<Accordion title="create_company">
+Create a new company record in Attio.
+
+**Parameters:**
+- `name` (string, required): Company name
+- `domain` (string, optional): Company domain
+- `attributes` (object, optional): Additional attributes as key-value pairs
+
+**Example:**
+```json
+{
+  "name": "Acme Corporation",
+  "domain": "acme.com",
+  "attributes": {
+    "industry": "Technology",
+    "employee_count": 500
+  }
+}
+```
+
+**Note:** Domains are stored as an array in Attio.
+</Accordion>
+
+<Accordion title="update_company">
+Update an existing company's attributes.
+
+**Parameters:**
+- `id` (string, required): Company ID
+- `attributes` (object, required): Attributes to update as key-value pairs
+
+**Example:**
+```json
+{
+  "id": "comp_123abc",
+  "attributes": {
+    "employee_count": 750,
+    "status": "active"
+  }
+}
+```
+</Accordion>
+
+### Contact Management
+
+<Accordion title="search_contacts">
+Search for contacts by name or email.
+
+**Parameters:**
+- `query` (string, required): Search query
+
+**Example:**
+```json
+{
+  "query": "john.doe@example.com"
+}
+```
+
+**Implementation:** Searches both full name and email address fields using `$or` and `$contains` operators.
+</Accordion>
+
+<Accordion title="read_contact">
+Retrieve detailed information about a specific contact.
+
+**Parameters:**
+- `id` (string, required): Contact ID
+
+**Example:**
+```json
+{
+  "id": "person_456def"
+}
+```
+</Accordion>
+
+<Accordion title="create_contact">
+Create a new contact in Attio.
+
+**Parameters:**
+- `email` (string, required): Contact email address
+- `first_name` (string, optional): First name
+- `last_name` (string, optional): Last name
+- `company_id` (string, optional): Company ID to associate with
+- `attributes` (object, optional): Additional attributes
+
+**Example:**
+```json
+{
+  "email": "john.doe@acme.com",
+  "first_name": "John",
+  "last_name": "Doe",
+  "company_id": "comp_123abc"
+}
+```
+
+**Note:** Names are structured with `full_name`, `first_name`, and `last_name` fields.
+</Accordion>
+
+<Accordion title="update_contact">
+Update an existing contact's attributes.
+
+**Parameters:**
+- `id` (string, required): Contact ID
+- `attributes` (object, required): Attributes to update
+
+**Example:**
+```json
+{
+  "id": "person_456def",
+  "attributes": {
+    "job_title": "Senior Engineer"
+  }
+}
+```
+</Accordion>
+
+### List Management
+
+<Accordion title="list_lists">
+Retrieve all available lists in your Attio workspace.
+
+**Parameters:** None
+
+**Returns:** Array of lists with ID and title information.
+</Accordion>
+
+<Accordion title="read_list">
+Read all records from a specific list.
+
+**Parameters:**
+- `list_id` (string, required): List ID
+
+**Example:**
+```json
+{
+  "list_id": "list_789ghi"
+}
+```
+</Accordion>
+
+<Accordion title="add_to_list">
+Add a company or contact record to a list.
+
+**Parameters:**
+- `list_id` (string, required): List ID
+- `record_id` (string, required): Record ID to add
+- `record_type` (string, required): Type of record - either `company` or `contact`
+
+**Example:**
+```json
+{
+  "list_id": "list_789ghi",
+  "record_id": "comp_123abc",
+  "record_type": "company"
+}
+```
+</Accordion>
+
+## API Reference
+
+Base URL: `https://api.attio.com/v2`
+
+All requests use Bearer token authentication. The server automatically handles token management through the OAuth flow.
+
+## Error Handling
+
+The server provides detailed error messages for:
+- Missing required parameters
+- Invalid record IDs
+- API authentication failures
+- Network errors
+
+Errors are returned as text content with appropriate status codes from the Attio API.

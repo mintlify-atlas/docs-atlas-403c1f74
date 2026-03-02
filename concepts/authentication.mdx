@@ -1,0 +1,526 @@
+---
+title: Authentication System
+description: Understanding guMCP's authentication architecture and OAuth 2.0 flows
+---
+
+guMCP provides a flexible **authentication system** that supports multiple credential storage backends and OAuth 2.0 flows. This enables servers to securely access third-party APIs on behalf of users.
+
+## Architecture Overview
+
+The authentication system uses a **factory pattern** with pluggable auth clients:
+
+```
+┌─────────────────┐
+│  Auth Factory   │
+└────────┬────────┘
+         │
+         ├─────────────────────────────────────┐
+         │                                     │
+┌────────▼────────┐                   ┌───────▼────────┐
+│ LocalAuthClient │                   │ RemoteAuthClient│
+│                 │                   │  (e.g. Gumloop) │
+│ File-based      │                   │  API-based      │
+└─────────────────┘                   └─────────────────┘
+```
+
+### Base Architecture
+
+All auth clients implement the `BaseAuthClient` interface:
+
+```python
+from typing import Dict, Any, Optional, TypeVar, Generic
+import abc
+
+CredentialsT = TypeVar("CredentialsT")
+
+class BaseAuthClient(Generic[CredentialsT], abc.ABC):
+    """Abstract base class for authentication clients."""
+    
+    @abc.abstractmethod
+    def get_user_credentials(
+        self, service_name: str, user_id: str
+    ) -> Optional[CredentialsT]:
+        """Retrieve user credentials for a specific service.
+        
+        Credentials returned should be ready-to-use (access tokens
+        should be refreshed already).
+        """
+        pass
+    
+    def get_oauth_config(self, service_name: str) -> Dict[str, Any]:
+        """Retrieve OAuth configuration for a service."""
+        raise NotImplementedError(
+            "This method is optional and not implemented by this client"
+        )
+    
+    def save_user_credentials(
+        self, service_name: str, user_id: str, credentials: CredentialsT
+    ) -> None:
+        """Save user credentials after authentication or refresh."""
+        raise NotImplementedError(
+            "This method is optional and not implemented by this client"
+        )
+```
+
+<Note>
+The `get_user_credentials()` method must return **refreshed, ready-to-use credentials**. Token refresh logic should be handled by the auth client implementation.
+</Note>
+
+## Auth Factory
+
+The factory creates the appropriate auth client based on environment:
+
+```python
+# From src/auth/factory.py
+import os
+from typing import Optional, TypeVar, Type
+from .clients.BaseAuthClient import BaseAuthClient
+
+def create_auth_client(
+    client_type: Optional[Type[T]] = None,
+    api_key: Optional[str] = None
+) -> BaseAuthClient:
+    """Factory function to create the appropriate auth client."""
+    
+    # Use specific client if provided
+    if client_type:
+        return client_type()
+    
+    # Otherwise, determine from environment
+    environment = os.environ.get("ENVIRONMENT", "local").lower()
+    
+    if environment == "gumloop":
+        from .clients.GumloopAuthClient import GumloopAuthClient
+        return GumloopAuthClient(api_key=api_key)
+    
+    # Default to local file auth client
+    from .clients.LocalAuthClient import LocalAuthClient
+    return LocalAuthClient()
+```
+
+### Usage
+
+```python
+from src.auth.factory import create_auth_client
+
+# Use default auth client (based on ENVIRONMENT)
+auth_client = create_auth_client()
+
+# Or specify a specific client type
+from src.auth.clients.LocalAuthClient import LocalAuthClient
+auth_client = create_auth_client(client_type=LocalAuthClient)
+```
+
+## LocalAuthClient
+
+The **LocalAuthClient** stores credentials in the local filesystem, ideal for development and self-hosted deployments.
+
+### Implementation
+
+```python
+# From src/auth/clients/LocalAuthClient.py
+import os
+import json
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+class LocalAuthClient(BaseAuthClient[CredentialsT]):
+    """File-based auth client for local development."""
+    
+    def __init__(
+        self,
+        oauth_config_base_dir: Optional[str] = None,
+        credentials_base_dir: Optional[str] = None,
+    ):
+        project_root = Path(__file__).parent.parent.parent.parent
+        
+        # Default directories relative to project root
+        self.oauth_config_base_dir = oauth_config_base_dir or os.environ.get(
+            "GUMCP_OAUTH_CONFIG_DIR",
+            str(project_root / "local_auth" / "oauth_configs")
+        )
+        
+        self.credentials_base_dir = credentials_base_dir or os.environ.get(
+            "GUMCP_CREDENTIALS_DIR",
+            str(project_root / "local_auth" / "credentials")
+        )
+        
+        # Ensure directories exist
+        os.makedirs(self.oauth_config_base_dir, exist_ok=True)
+        os.makedirs(self.credentials_base_dir, exist_ok=True)
+```
+
+### Directory Structure
+
+```
+guMCP/
+└── local_auth/
+    ├── oauth_configs/
+    │   ├── slack/
+    │   │   └── oauth.json
+    │   ├── gdrive/
+    │   │   └── oauth.json
+    │   └── github/
+    │       └── oauth.json
+    └── credentials/
+        ├── slack/
+        │   └── local_credentials.json
+        ├── gdrive/
+        │   └── local_credentials.json
+        └── github/
+            └── local_credentials.json
+```
+
+### Getting OAuth Config
+
+```python
+def get_oauth_config(self, service_name: str) -> Dict[str, Any]:
+    """Retrieve OAuth configuration from local file."""
+    service_dir = os.path.join(self.oauth_config_base_dir, service_name)
+    config_path = os.path.join(service_dir, "oauth.json")
+    
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(
+            f"OAuth config not found for {service_name} at {config_path}"
+        )
+    
+    with open(config_path, "r") as f:
+        return json.load(f)
+```
+
+Example `oauth.json`:
+
+```json
+{
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "redirect_uri": "http://localhost:8080"
+}
+```
+
+<Tip>
+The default redirect URI is `http://localhost:8080`, matching the OAuth utility in `src/utils/oauth/util.py`. Use this for consistency unless you have specific requirements.
+</Tip>
+
+### Getting User Credentials
+
+```python
+def get_user_credentials(
+    self, service_name: str, user_id: str
+) -> Optional[CredentialsT]:
+    """Retrieve user credentials from local file."""
+    service_dir = os.path.join(self.credentials_base_dir, service_name)
+    creds_path = os.path.join(service_dir, f"{user_id}_credentials.json")
+    
+    if not os.path.exists(creds_path):
+        return None
+    
+    with open(creds_path, "r") as f:
+        credentials_data = json.load(f)
+    
+    # Caller is responsible for converting JSON to appropriate type
+    return credentials_data
+```
+
+### Saving User Credentials
+
+```python
+def save_user_credentials(
+    self,
+    service_name: str,
+    user_id: str,
+    credentials: Union[CredentialsT, Dict[str, Any]],
+) -> None:
+    """Save user credentials to local file."""
+    service_dir = os.path.join(self.credentials_base_dir, service_name)
+    os.makedirs(service_dir, exist_ok=True)
+    
+    creds_path = os.path.join(service_dir, f"{user_id}_credentials.json")
+    
+    # Handle different credential types
+    if hasattr(credentials, "to_json"):
+        credentials_json = credentials.to_json()
+    elif isinstance(credentials, dict):
+        credentials_json = json.dumps(credentials)
+    else:
+        credentials_json = json.dumps(credentials)
+    
+    with open(creds_path, "w") as f:
+        f.write(credentials_json)
+```
+
+## OAuth 2.0 Flow
+
+guMCP provides utilities for implementing OAuth 2.0 authentication flows.
+
+### Setup Process
+
+From the CONTRIBUTING.md guide:
+
+#### 1. Create OAuth Configuration
+
+Create a configuration file for your service:
+
+```bash
+mkdir -p local_auth/oauth_configs/slack
+```
+
+```json
+// local_auth/oauth_configs/slack/oauth.json
+{
+  "client_id": "your_slack_client_id",
+  "client_secret": "your_slack_client_secret",
+  "redirect_uri": "http://localhost:8080"
+}
+```
+
+<Info>
+The redirect URI `http://localhost:8080` is the default used by guMCP's OAuth utilities. This starts a local server to capture the authorization code.
+</Info>
+
+#### 2. Implement Authentication Flow
+
+Create a utility function to handle OAuth:
+
+```python
+# src/utils/slack/util.py
+from src.auth.factory import create_auth_client
+from src.utils.oauth.util import run_oauth_flow
+
+def get_credentials(user_id: str):
+    """Get Slack credentials, running OAuth flow if needed."""
+    auth_client = create_auth_client()
+    
+    # Try to get existing credentials
+    credentials = auth_client.get_user_credentials("slack", user_id)
+    
+    if not credentials:
+        # Run OAuth flow
+        oauth_config = auth_client.get_oauth_config("slack")
+        credentials = run_oauth_flow(
+            service_name="slack",
+            user_id=user_id,
+            scopes=["channels:read", "chat:write"],
+            oauth_config=oauth_config
+        )
+        
+        # Save for future use
+        auth_client.save_user_credentials("slack", user_id, credentials)
+    
+    return credentials
+```
+
+#### 3. Use in Server
+
+```python
+# src/servers/slack/main.py
+from src.utils.slack.util import get_credentials
+
+class SlackServer:
+    def __init__(self, user_id: str, api_key: str = None):
+        self.user_id = user_id
+        self.credentials = None
+    
+    async def initialize(self):
+        """Initialize server with credentials."""
+        self.credentials = get_credentials(self.user_id)
+```
+
+### OAuth Flow Patterns
+
+From CONTRIBUTING.md, there are different OAuth patterns:
+
+#### Simple OAuth (No Refresh Token)
+
+**Example: Slack**
+
+Some services don't use refresh tokens. The access token is long-lived:
+
+```python
+# src/utils/slack/util.py
+def get_credentials(user_id: str):
+    auth_client = create_auth_client()
+    credentials = auth_client.get_user_credentials("slack", user_id)
+    
+    if not credentials:
+        # Run OAuth flow once
+        credentials = run_oauth_flow(
+            service_name="slack",
+            user_id=user_id,
+            scopes=["channels:read"],
+            oauth_config=auth_client.get_oauth_config("slack")
+        )
+        auth_client.save_user_credentials("slack", user_id, credentials)
+    
+    return credentials
+```
+
+#### OAuth with Refresh Tokens
+
+**Example: Attio, Airtable**
+
+Most modern OAuth services use refresh tokens:
+
+```python
+# Pattern for services with refresh tokens
+from src.utils.oauth.util import refresh_token_if_needed
+
+def get_credentials(user_id: str):
+    auth_client = create_auth_client()
+    credentials = auth_client.get_user_credentials("service", user_id)
+    
+    if not credentials:
+        # Initial OAuth flow
+        credentials = run_oauth_flow(
+            service_name="service",
+            user_id=user_id,
+            scopes=["read", "write"],
+            oauth_config=auth_client.get_oauth_config("service")
+        )
+    
+    # Automatically refresh if needed
+    credentials = refresh_token_if_needed(
+        credentials=credentials,
+        oauth_config=auth_client.get_oauth_config("service"),
+        service_name="service",
+        user_id=user_id
+    )
+    
+    return credentials
+```
+
+#### OAuth with PKCE
+
+**Example: Airtable**
+
+Some services require PKCE (Proof Key for Code Exchange):
+
+```python
+# Airtable uses PKCE for enhanced security
+from src.utils.oauth.util import run_oauth_flow_with_pkce
+
+def get_credentials(user_id: str):
+    auth_client = create_auth_client()
+    credentials = auth_client.get_user_credentials("airtable", user_id)
+    
+    if not credentials:
+        credentials = run_oauth_flow_with_pkce(
+            service_name="airtable",
+            user_id=user_id,
+            scopes=["data.records:read", "data.records:write"],
+            oauth_config=auth_client.get_oauth_config("airtable")
+        )
+        auth_client.save_user_credentials("airtable", user_id, credentials)
+    
+    return credentials
+```
+
+<Note>
+Review the example implementations in `src/utils/slack/`, `src/utils/attio/`, and `src/utils/airtable/` for complete working examples of each OAuth pattern.
+</Note>
+
+## Non-OAuth Authentication
+
+For services using API keys or other non-OAuth methods:
+
+### API Key Example
+
+**From Perplexity Server:**
+
+```python
+# src/servers/perplexity/main.py
+class PerplexityServer:
+    def __init__(self, user_id: str, api_key: str = None):
+        self.user_id = user_id
+        self.api_key = api_key
+        
+        if not self.api_key:
+            # Get from auth client
+            auth_client = create_auth_client()
+            stored_creds = auth_client.get_user_credentials(
+                "perplexity", 
+                user_id
+            )
+            if stored_creds:
+                self.api_key = stored_creds.get("api_key")
+```
+
+Store API key in credentials file:
+
+```json
+// local_auth/credentials/perplexity/local_credentials.json
+{
+  "api_key": "your_perplexity_api_key"
+}
+```
+
+## Remote Auth Clients
+
+For production deployments, you can implement custom auth clients that fetch credentials from remote APIs:
+
+```python
+class RemoteAuthClient(BaseAuthClient):
+    def __init__(self, api_endpoint: str, api_key: str):
+        self.api_endpoint = api_endpoint
+        self.api_key = api_key
+    
+    def get_user_credentials(self, service_name: str, user_id: str):
+        """Fetch credentials from remote API."""
+        response = requests.get(
+            f"{self.api_endpoint}/credentials/{service_name}/{user_id}",
+            headers={"Authorization": f"Bearer {self.api_key}"}
+        )
+        
+        if response.status_code == 200:
+            credentials = response.json()
+            # Refresh token if needed before returning
+            return self._refresh_if_needed(credentials)
+        
+        return None
+```
+
+<Info>
+Remote auth clients must handle token refresh on their side. The `get_user_credentials()` method should always return fresh, ready-to-use tokens.
+</Info>
+
+## Environment Variables
+
+Configure the auth system using environment variables:
+
+```bash
+# Set environment mode
+export ENVIRONMENT=local  # or "gumloop" for production
+
+# Override default directories (optional)
+export GUMCP_OAUTH_CONFIG_DIR=/path/to/oauth_configs
+export GUMCP_CREDENTIALS_DIR=/path/to/credentials
+```
+
+## Security Best Practices
+
+<Warning>
+Never commit credential files or OAuth secrets to version control. Add them to `.gitignore`:
+
+```
+local_auth/
+.env
+*_credentials.json
+oauth.json
+```
+</Warning>
+
+### Recommendations:
+
+1. **Encrypt credentials at rest** when possible
+2. **Use environment-specific configs** (dev, staging, prod)
+3. **Rotate OAuth secrets regularly**
+4. **Implement credential expiry checks**
+5. **Log authentication failures** for security monitoring
+6. **Use HTTPS** for all remote auth endpoints
+
+## Next Steps
+
+- Explore [OAuth utility functions](https://github.com/gumloop/guMCP/tree/main/src/utils/oauth) in the source
+- Review [example implementations](https://github.com/gumloop/guMCP/tree/main/src/utils) (Slack, Attio, Airtable)
+- Learn about [Transports](/concepts/transports) for securing SSE connections
+- See the [CONTRIBUTING.md](https://github.com/gumloop/guMCP/blob/main/CONTRIBUTING.MD) guide for detailed OAuth setup

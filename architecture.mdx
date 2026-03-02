@@ -1,0 +1,414 @@
+---
+title: Architecture overview
+description: Understanding the unified backend structure that powers all guMCP servers
+---
+
+## Architecture principles
+
+guMCP is built on a unified backend architecture that enables every server to work seamlessly with both local (stdio) and remote (SSE) transports. This design eliminates the need for separate implementations while providing flexibility in deployment models.
+
+<Note>
+  The key insight: servers are transport-agnostic. The same server code runs locally in Claude Desktop via stdio or remotely in Cursor via SSE without any modifications.
+</Note>
+
+## Core components
+
+<CardGroup cols={2}>
+  <Card title="Server discovery" icon="radar">
+    Automatic detection and loading of servers from the file system
+  </Card>
+  <Card title="Transport layer" icon="arrows-left-right">
+    Stdio and SSE transports with consistent interfaces
+  </Card>
+  <Card title="Auth system" icon="shield-halved">
+    Pluggable authentication via factory pattern
+  </Card>
+  <Card title="Session management" icon="users">
+    User-specific server instances and state isolation
+  </Card>
+</CardGroup>
+
+## Directory structure
+
+```
+guMCP/
+├── src/
+│   ├── auth/                    # Authentication system
+│   │   ├── factory.py          # Auth client factory
+│   │   └── clients/
+│   │       ├── BaseAuthClient.py      # Abstract base class
+│   │       ├── LocalAuthClient.py     # File-based auth
+│   │       └── GumloopAuthClient.py   # Remote auth example
+│   ├── servers/
+│   │   ├── main.py             # Entry point for remote server
+│   │   ├── remote.py           # SSE transport implementation
+│   │   ├── local.py            # Stdio transport implementation
+│   │   └── <server-name>/      # Individual server implementations
+│   │       ├── main.py         # Server logic and tool definitions
+│   │       └── README.md       # Server-specific documentation
+│   └── utils/                   # Shared utilities
+├── local_auth/                  # Local credential storage
+│   ├── oauth_configs/          # OAuth app configurations
+│   └── credentials/            # User credentials by service
+└── tests/                       # Test suite
+    ├── clients/                # MCP test clients
+    └── servers/                # Server-specific tests
+```
+
+## Server lifecycle
+
+### 1. Server discovery
+
+The remote server (`src/servers/remote.py:40-83`) automatically discovers all available servers by scanning the `src/servers/` directory:
+
+```python
+def discover_servers():
+    servers_dir = Path(__file__).parent.absolute()
+    
+    for item in servers_dir.iterdir():
+        if item.is_dir():
+            server_file = item / "main.py"
+            if server_file.exists():
+                # Load server module dynamically
+                server = server_module.server
+                get_init_options = server_module.get_initialization_options
+                servers[server_name] = {
+                    "server": server,
+                    "get_initialization_options": get_init_options,
+                }
+```
+
+Each server directory must contain a `main.py` file that exports:
+- `server` - Factory function that creates server instances
+- `get_initialization_options` - Function returning initialization config
+
+### 2. Server initialization
+
+Servers follow a factory pattern for creation. Example from `src/servers/simple-tools-server/main.py:16-24`:
+
+```python
+def create_server(user_id=None, api_key=None):
+    server = Server("simple-tools-server")
+    
+    if user_id:
+        server.user_id = user_id
+        # Initialize user-specific state
+        if user_id not in user_data_stores:
+            user_data_stores[user_id] = {}
+    
+    # Register tools, resources, prompts
+    @server.list_tools()
+    async def handle_list_tools() -> list[types.Tool]:
+        # Tool definitions
+    
+    return server
+```
+
+<Tip>
+  The factory pattern enables user-specific server instances, which is critical for multi-tenant remote deployments where each user needs isolated state.
+</Tip>
+
+### 3. Transport connection
+
+#### Stdio transport (local)
+
+The local runner (`src/servers/local.py:62-87`) creates a single server instance and connects it to stdin/stdout:
+
+```python
+async def main():
+    server_creator, get_initialization_options = await load_server(args.server)
+    server_instance = server_creator(user_id=args.user_id)
+    
+    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+        await server_instance.run(
+            read_stream,
+            write_stream,
+            get_initialization_options(server_instance),
+        )
+```
+
+#### SSE transport (remote)
+
+The remote server (`src/servers/remote.py:113-179`) creates user-specific connections with session management:
+
+```python
+async def handle_sse(request):
+    session_key_encoded = request.path_params["session_key"]
+    session_key = f"{server_name}:{session_key_encoded}"
+    
+    # Parse user_id and api_key from session
+    if ":" in session_key_encoded:
+        user_id, api_key = session_key_encoded.split(":")
+    
+    # Create SSE transport
+    sse_transport = SseServerTransport(
+        f"/{server_name}/{session_key_encoded}/messages/"
+    )
+    
+    # Reuse or create server instance for this user
+    if session_key not in user_server_instances:
+        server_instance = server_factory(user_id, api_key)
+        user_server_instances[session_key] = server_instance
+    
+    # Run server with SSE streams
+    async with sse_transport.connect_sse(request.scope, request.receive, request._send) as streams:
+        await server_instance.run(streams[0], streams[1], init_options)
+```
+
+<Warning>
+  SSE connections maintain server instances per user session, allowing state persistence across reconnections. Instances are cleaned up when connections close.
+</Warning>
+
+## Authentication architecture
+
+### Auth client abstraction
+
+The `BaseAuthClient` (`src/auth/clients/BaseAuthClient.py:8-58`) defines the interface for credential management:
+
+```python
+class BaseAuthClient(Generic[CredentialsT], abc.ABC):
+    @abc.abstractmethod
+    def get_user_credentials(self, service_name: str, user_id: str) -> Optional[CredentialsT]:
+        """Returns refreshed, ready-to-use credentials"""
+    
+    def get_oauth_config(self, service_name: str) -> Dict[str, Any]:
+        """Returns OAuth app configuration"""
+    
+    def save_user_credentials(self, service_name: str, user_id: str, credentials: CredentialsT) -> None:
+        """Persists credentials after auth or refresh"""
+```
+
+<Tip>
+  The generic `CredentialsT` type allows each implementation to work with service-specific credential formats (Google's `Credentials`, Slack's `AccessToken`, etc.).
+</Tip>
+
+### Factory pattern
+
+The auth factory (`src/auth/factory.py:12-39`) selects the appropriate client based on environment:
+
+```python
+def create_auth_client(
+    client_type: Optional[Type[T]] = None,
+    api_key: Optional[str] = None
+) -> BaseAuthClient:
+    if client_type:
+        return client_type()
+    
+    environment = os.environ.get("ENVIRONMENT", "local").lower()
+    
+    if environment == "gumloop":
+        from .clients.GumloopAuthClient import GumloopAuthClient
+        return GumloopAuthClient(api_key=api_key)
+    
+    # Default to local file auth
+    from .clients.LocalAuthClient import LocalAuthClient
+    return LocalAuthClient()
+```
+
+### Local auth implementation
+
+The `LocalAuthClient` (`src/auth/clients/LocalAuthClient.py:17-123`) stores credentials in the file system:
+
+- **OAuth configs**: `local_auth/oauth_configs/<service_name>/oauth.json`
+  ```json
+  {
+    "client_id": "...",
+    "client_secret": "...",
+    "redirect_uri": "http://localhost:8080"
+  }
+  ```
+
+- **User credentials**: `local_auth/credentials/<service_name>/<user_id>_credentials.json`
+  ```json
+  {
+    "access_token": "...",
+    "refresh_token": "...",
+    "expires_at": 1234567890
+  }
+  ```
+
+<Note>
+  The `LocalAuthClient` is designed for single-user local development. For production deployments, implement a custom `BaseAuthClient` that integrates with your authentication infrastructure.
+</Note>
+
+## Server implementation patterns
+
+### Minimal server structure
+
+Every server must implement these components in `main.py`:
+
+```python
+import mcp.types as types
+from mcp.server import Server
+from mcp.server.models import InitializationOptions
+
+def create_server(user_id=None, api_key=None):
+    server = Server("my-server-name")
+    
+    # Register tools
+    @server.list_tools()
+    async def handle_list_tools() -> list[types.Tool]:
+        return [types.Tool(...)]
+    
+    @server.call_tool()
+    async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+        # Tool implementation
+        pass
+    
+    return server
+
+# Export factory function
+server = create_server
+
+# Export initialization options
+def get_initialization_options(server_instance: Server) -> InitializationOptions:
+    return InitializationOptions(
+        server_name="my-server-name",
+        server_version="1.0.0",
+        capabilities=server_instance.get_capabilities(...),
+    )
+```
+
+### Authentication integration
+
+Servers that require authentication use the factory-created auth client:
+
+```python
+from src.auth.factory import create_auth_client
+
+def create_server(user_id=None, api_key=None):
+    server = Server("authenticated-server")
+    
+    # Create auth client (automatically selects implementation)
+    auth_client = create_auth_client(api_key=api_key)
+    
+    @server.call_tool()
+    async def handle_call_tool(name: str, arguments: dict | None):
+        # Get credentials for this user
+        credentials = auth_client.get_user_credentials("service-name", user_id)
+        
+        if not credentials:
+            raise ValueError(f"No credentials found for user {user_id}")
+        
+        # Use credentials to call service API
+        # ...
+    
+    return server
+```
+
+### User-specific state
+
+For servers that maintain state, use user-specific storage:
+
+```python
+user_data_stores = {}  # Global store
+
+def create_server(user_id=None, api_key=None):
+    server = Server("stateful-server")
+    
+    if user_id and user_id not in user_data_stores:
+        user_data_stores[user_id] = {}
+    
+    @server.call_tool()
+    async def handle_call_tool(name: str, arguments: dict | None):
+        current_user = getattr(server, "user_id", None)
+        data_store = user_data_stores.get(current_user, {})
+        
+        # Use user-specific data store
+        # ...
+    
+    return server
+```
+
+<Warning>
+  For remote deployments, be mindful of memory usage when storing user state in-memory. Consider using a database or cache for production workloads.
+</Warning>
+
+## Routing and endpoints
+
+### SSE endpoint structure
+
+The remote server exposes two endpoints per server:
+
+1. **Connection endpoint**: `/{server-name}/{session-key}`
+   - Establishes SSE connection
+   - Creates or reuses user-specific server instance
+   - Session key format: `{user_id}:{api_key}` (URL encoded)
+
+2. **Message endpoint**: `/{server-name}/{session-key}/messages/`
+   - Handles client messages via POST
+   - Routes to the appropriate SSE transport
+
+### Health and metrics
+
+Built-in endpoints for monitoring:
+
+- `/` - Root endpoint returning server status and available servers
+- `/health_check` - Health check with server list
+- `/metrics` (port 9091) - Prometheus metrics including:
+  - `gumcp_active_connections` - Active SSE connections per server
+  - `gumcp_connection_total` - Total connection count per server
+
+## Deployment models
+
+<CardGroup cols={2}>
+  <Card title="Local (stdio)" icon="computer">
+    **Use case**: Claude Desktop, local development
+    
+    **Characteristics**:
+    - Single user per server instance
+    - Communication via stdin/stdout
+    - Credentials from local files
+    - Started via `python src/servers/local.py --server=<name>`
+  </Card>
+  <Card title="Remote (SSE)" icon="cloud">
+    **Use case**: Cursor, web applications, multi-user deployments
+    
+    **Characteristics**:
+    - Multiple concurrent users
+    - HTTP/SSE transport
+    - Session-based authentication
+    - Started via `python src/servers/remote.py` or `./start_sse_dev_server.sh`
+  </Card>
+</CardGroup>
+
+## Key design decisions
+
+### Why factory functions?
+
+Factory functions (`create_server(user_id, api_key)`) enable:
+- User-specific server instances for multi-tenant deployments
+- Lazy initialization of resources
+- Testability through dependency injection
+
+### Why separate transports?
+
+Separating stdio and SSE implementations (`local.py` vs `remote.py`) provides:
+- Clear separation of concerns
+- Optimized code paths for each deployment model
+- Easier testing and debugging
+
+### Why pluggable auth?
+
+The `BaseAuthClient` abstraction enables:
+- Local development with file-based credentials
+- Production deployment with database-backed auth
+- Custom authentication schemes (API gateways, OAuth proxies, etc.)
+- Easy testing with mock auth clients
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up your development environment
+  </Card>
+  <Card title="Local deployment" icon="computer" href="/deployment/local-stdio">
+    Run your first server locally
+  </Card>
+  <Card title="Remote deployment" icon="cloud" href="/deployment/remote-sse">
+    Deploy the SSE server
+  </Card>
+  <Card title="Creating servers" icon="code" href="/development/creating-servers">
+    Build your own MCP server
+  </Card>
+</CardGroup>

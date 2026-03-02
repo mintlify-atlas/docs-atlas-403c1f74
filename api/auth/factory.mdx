@@ -1,0 +1,193 @@
+---
+title: "create_auth_client"
+description: "Factory function to create authentication clients"
+---
+
+## Overview
+
+The `create_auth_client()` factory function creates the appropriate authentication client based on the environment or a specified client type.
+
+**Source:** `src/auth/factory.py:12`
+
+## Function Signature
+
+```python
+from typing import Optional, TypeVar, Type
+from .clients.BaseAuthClient import BaseAuthClient
+
+T = TypeVar("T", bound=BaseAuthClient)
+
+def create_auth_client(
+    client_type: Optional[Type[T]] = None, 
+    api_key: Optional[str] = None
+) -> BaseAuthClient:
+```
+
+## Parameters
+
+<ParamField path="client_type" type="Optional[Type[T]]">
+  Optional specific client class to instantiate directly. If provided, this client type will be used regardless of environment.
+</ParamField>
+
+<ParamField path="api_key" type="Optional[str]">
+  Optional API key for Gumloop authentication. Only used when creating a `GumloopAuthClient`.
+</ParamField>
+
+## Returns
+
+<ResponseField name="return" type="BaseAuthClient">
+  An instance of the appropriate `BaseAuthClient` implementation
+</ResponseField>
+
+## Behavior
+
+### Explicit Client Type
+
+If `client_type` is specified, that client is instantiated directly:
+
+```python
+from src.auth.factory import create_auth_client
+from src.auth.clients.LocalAuthClient import LocalAuthClient
+
+# Explicitly create a local client
+client = create_auth_client(client_type=LocalAuthClient)
+```
+
+### Environment-Based Selection
+
+If `client_type` is not specified, the function determines the client type from the `ENVIRONMENT` environment variable:
+
+<ResponseField name="ENVIRONMENT=gumloop">
+  Creates a `GumloopAuthClient` instance with the provided `api_key`
+</ResponseField>
+
+<ResponseField name="ENVIRONMENT=local" default>
+  Creates a `LocalAuthClient` instance (default behavior)
+</ResponseField>
+
+## Environment Variables
+
+<ParamField path="ENVIRONMENT" type="string">
+  Determines which auth client to create. Valid values: `"gumloop"`, `"local"`. Defaults to `"local"`.
+</ParamField>
+
+## Examples
+
+### Default Usage (Environment-Based)
+
+```python
+import os
+from src.auth.factory import create_auth_client
+
+# Set environment
+os.environ["ENVIRONMENT"] = "local"
+
+# Create appropriate client
+client = create_auth_client()
+# Returns LocalAuthClient instance
+```
+
+### Gumloop Environment
+
+```python
+import os
+from src.auth.factory import create_auth_client
+
+# Set environment
+os.environ["ENVIRONMENT"] = "gumloop"
+
+# Create Gumloop client with API key
+api_key = os.environ.get("GUMLOOP_API_KEY")
+client = create_auth_client(api_key=api_key)
+# Returns GumloopAuthClient instance
+```
+
+### Explicit Client Type
+
+```python
+from src.auth.factory import create_auth_client
+from src.auth.clients.GumloopAuthClient import GumloopAuthClient
+
+# Force specific client type
+client = create_auth_client(
+    client_type=GumloopAuthClient,
+    api_key="your-api-key"
+)
+```
+
+### Using the Client
+
+```python
+from src.auth.factory import create_auth_client
+
+# Create client
+client = create_auth_client()
+
+# Get OAuth config
+config = client.get_oauth_config("slack")
+
+# Get user credentials
+creds = client.get_user_credentials("slack", "user123")
+
+# Save credentials (if supported)
+client.save_user_credentials("slack", "user123", creds)
+```
+
+## Implementation Details
+
+**Source Code:**
+
+```python
+def create_auth_client(
+    client_type: Optional[Type[T]] = None, api_key: Optional[str] = None
+) -> BaseAuthClient:
+    # If client_type is specified, use it directly
+    if client_type:
+        return client_type()
+
+    # Otherwise, determine from environment
+    environment = os.environ.get("ENVIRONMENT", "local").lower()
+
+    if environment == "gumloop":
+        from .clients.GumloopAuthClient import GumloopAuthClient
+        return GumloopAuthClient(api_key=api_key)
+
+    # Default to local file auth client
+    from .clients.LocalAuthClient import LocalAuthClient
+    return LocalAuthClient()
+```
+
+## Use Cases
+
+### Development
+
+```python
+# Local development with file-based credentials
+os.environ["ENVIRONMENT"] = "local"
+client = create_auth_client()
+```
+
+### Production (Gumloop)
+
+```python
+# Production using Gumloop infrastructure
+os.environ["ENVIRONMENT"] = "gumloop"
+client = create_auth_client(api_key=os.environ["GUMLOOP_API_KEY"])
+```
+
+### Testing
+
+```python
+# Testing with mock client
+class MockAuthClient(BaseAuthClient):
+    def get_user_credentials(self, service_name, user_id):
+        return {"access_token": "mock-token"}
+
+client = create_auth_client(client_type=MockAuthClient)
+```
+
+## See Also
+
+- [BaseAuthClient](/api/auth/base-client) - Base interface
+- [LocalAuthClient](/api/auth/local-client) - Local file implementation
+- [GumloopAuthClient](/api/auth/gumloop-client) - Gumloop API implementation

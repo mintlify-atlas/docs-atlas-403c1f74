@@ -1,0 +1,330 @@
+---
+title: Creating MCP Servers
+description: Guide for building new MCP servers in guMCP
+---
+
+This guide walks you through creating a new MCP server in guMCP, using real patterns from the codebase.
+
+## Server Structure
+
+Every server in guMCP follows a consistent pattern:
+
+```
+src/servers/your-server/
+├── main.py              # Server implementation
+└── handlers/            # Optional: complex tool handlers
+    └── tools.py
+```
+
+## Basic Server Template
+
+Here's the essential structure every server should follow (from `simple-tools-server/main.py`):
+
+```python
+import logging
+import mcp.types as types
+from mcp.server import NotificationOptions, Server
+from mcp.server.models import InitializationOptions
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("your-server-name")
+
+def create_server(user_id=None, api_key=None):
+    """Create a new server instance with optional user context"""
+    server = Server("your-server-name")
+
+    if user_id:
+        server.user_id = user_id
+
+    @server.list_tools()
+    async def handle_list_tools() -> list[types.Tool]:
+        """List available tools with JSON Schema validation"""
+        current_user = getattr(server, "user_id", None)
+        logger.info(f"Listing tools for user: {current_user}")
+
+        return [
+            types.Tool(
+                name="your-tool",
+                description="What your tool does",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "param": {"type": "string"},
+                    },
+                    "required": ["param"],
+                },
+            ),
+        ]
+
+    @server.call_tool()
+    async def handle_call_tool(
+        name: str, arguments: dict | None
+    ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+        """Handle tool execution requests"""
+        current_user = getattr(server, "user_id", None)
+        logger.info(
+            f"User {current_user} calling tool: {name} with arguments: {arguments}"
+        )
+
+        if name == "your-tool":
+            # Tool implementation
+            return [
+                types.TextContent(
+                    type="text",
+                    text="Tool response",
+                )
+            ]
+
+        raise ValueError(f"Unknown tool: {name}")
+
+    return server
+
+server = create_server
+
+def get_initialization_options(server_instance: Server) -> InitializationOptions:
+    """Get the initialization options for the server"""
+    return InitializationOptions(
+        server_name="your-server-name",
+        server_version="1.0.0",
+        capabilities=server_instance.get_capabilities(
+            notification_options=NotificationOptions(),
+            experimental_capabilities={},
+        ),
+    )
+```
+
+## Adding Authentication
+
+### OAuth 2.0 Servers
+
+For OAuth-based integrations, create utility functions in `src/utils/your-service/util.py`:
+
+```python
+from src.utils.oauth.util import run_oauth_flow, refresh_token_if_needed
+
+SERVICE_OAUTH_AUTHORIZE_URL = "https://..."
+SERVICE_OAUTH_TOKEN_URL = "https://..."
+
+def authenticate_and_save_credentials(
+    user_id: str, service_name: str, scopes: list[str]
+) -> dict:
+    """Authenticate with service and save credentials"""
+    return run_oauth_flow(
+        service_name=service_name,
+        user_id=user_id,
+        scopes=scopes,
+        auth_url_base=SERVICE_OAUTH_AUTHORIZE_URL,
+        token_url=SERVICE_OAUTH_TOKEN_URL,
+        auth_params_builder=build_auth_params,
+        token_data_builder=build_token_data,
+        process_token_response=process_token_response,
+    )
+
+async def get_credentials(
+    user_id: str, service_name: str, api_key: str = None
+) -> str:
+    """Get credentials with automatic refresh"""
+    return await refresh_token_if_needed(
+        user_id=user_id,
+        service_name=service_name,
+        token_url=SERVICE_OAUTH_TOKEN_URL,
+        token_data_builder=build_refresh_token_data,
+        api_key=api_key,
+    )
+```
+
+#### OAuth Configuration
+
+Create OAuth configuration at `local_auth/oauth_configs/<service_name>/oauth.json`:
+
+```json
+{
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "redirect_uri": "http://localhost:8080"
+}
+```
+
+<Note>
+  The default redirect URI `http://localhost:8080` is recommended as it matches the OAuth utility defaults.
+</Note>
+
+#### OAuth Examples
+
+Review these example implementations:
+
+- **[Slack](https://github.com/gumloop/guMCP/blob/main/src/utils/slack/util.py)** - OAuth 2.0 without refresh tokens
+- **[Attio](https://github.com/gumloop/guMCP/blob/main/src/utils/attio/util.py)** - OAuth 2.0 with refresh tokens and additional params
+- **[Airtable](https://github.com/gumloop/guMCP/blob/main/src/utils/airtable/util.py)** - OAuth 2.0 with refresh tokens and PKCE
+
+<Warning>
+  **HIGHLY RECOMMENDED**: Review these examples before implementing OAuth integration.
+</Warning>
+
+### API Key Authentication
+
+For simpler API key-based authentication (from `perplexity/main.py`):
+
+```python
+from src.auth.factory import create_auth_client
+
+def authenticate_and_save_api_key(user_id):
+    """Authenticate and save API key"""
+    auth_client = create_auth_client()
+
+    # Prompt user for API key if running locally
+    api_key = input("Please enter your API key: ").strip()
+
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Save using auth client
+    auth_client.save_user_credentials(
+        "service_name", user_id, {"api_key": api_key}
+    )
+
+    return api_key
+
+async def get_credentials(user_id, api_key=None):
+    """Get API key for the specified user"""
+    auth_client = create_auth_client(api_key=api_key)
+    credentials_data = auth_client.get_user_credentials(
+        "service_name", user_id
+    )
+
+    if not credentials_data:
+        raise ValueError(f"Credentials not found for user {user_id}")
+
+    return credentials_data.get("api_key")
+```
+
+## User-Specific State
+
+To maintain per-user state:
+
+```python
+user_data_stores = {}
+
+def create_server(user_id=None, api_key=None):
+    server = Server("your-server")
+
+    if user_id:
+        server.user_id = user_id
+        # Initialize user data store if needed
+        if user_id not in user_data_stores:
+            user_data_stores[user_id] = {}
+
+    @server.call_tool()
+    async def handle_call_tool(name: str, arguments: dict | None):
+        current_user = getattr(server, "user_id", None)
+        data_store = user_data_stores.get(current_user, {})
+
+        # Use data_store for user-specific operations
+        # ...
+```
+
+## Adding Prompts
+
+Servers can expose reusable prompts:
+
+```python
+from mcp.types import Prompt, PromptArgument, PromptMessage, GetPromptResult
+
+@server.list_prompts()
+async def handle_list_prompts() -> list[Prompt]:
+    """List available prompts"""
+    return [
+        Prompt(
+            name="your_prompt",
+            description="What the prompt does",
+            arguments=[
+                PromptArgument(
+                    name="query",
+                    description="The input query",
+                    required=True
+                ),
+            ],
+        ),
+    ]
+
+@server.get_prompt()
+async def handle_get_prompt(
+    name: str, arguments: dict[str, str] | None = None
+) -> GetPromptResult:
+    """Get a specific prompt with arguments"""
+    if name == "your_prompt":
+        query = arguments.get("query", "")
+        return GetPromptResult(
+            description=f"Prompt for {query}",
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=types.TextContent(type="text", text=query)
+                ),
+            ],
+        )
+
+    raise ValueError(f"Unknown prompt: {name}")
+```
+
+## Command-Line Auth Handler
+
+Add a main block for local authentication:
+
+```python
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1].lower() == "auth":
+        user_id = "local"
+        authenticate_and_save_credentials(user_id, "service", ["scope1"])
+    else:
+        print("Usage:")
+        print("  python main.py auth - Run authentication flow")
+        print("Note: To run the server, use the guMCP framework.")
+```
+
+## Testing Your Server
+
+Create `tests/servers/your-server/tests.py`. See the [Testing Guide](/development/testing) for details.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Error Handling">
+    - Always validate arguments before use
+    - Return descriptive error messages
+    - Log errors with appropriate levels
+    - Handle API failures gracefully
+  </Accordion>
+
+  <Accordion title="Security">
+    - Never log sensitive credentials
+    - Use the auth client for credential storage
+    - Validate all user inputs
+    - Use HTTPS for API calls
+  </Accordion>
+
+  <Accordion title="Performance">
+    - Use async/await properly
+    - Set appropriate timeouts for API calls
+    - Cache responses when appropriate
+    - Clean up resources in error cases
+  </Accordion>
+
+  <Accordion title="Documentation">
+    - Write clear tool descriptions
+    - Document all parameters with types
+    - Include usage examples in docstrings
+    - Keep initialization options up to date
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+- Read the [Testing Guide](/development/testing) to test your server
+- Review [Code Style](/development/code-style) standards
+- Check out [Contributing Guidelines](/development/contributing) before submitting
+- Look at existing servers in `src/servers/` for more examples

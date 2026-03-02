@@ -1,0 +1,304 @@
+---
+title: HubSpot
+description: Interact with HubSpot CRM for managing contacts, companies, and deals
+---
+
+The HubSpot server provides comprehensive CRM functionality, allowing you to manage contacts, companies, deals, and engagements through the MCP protocol.
+
+## Authentication
+
+This server uses OAuth 2.0 authentication. You'll need:
+
+- A HubSpot Developer Account ([sign up here](https://developers.hubspot.com/))
+- A registered HubSpot App with OAuth 2.0 configured
+
+### Required Scopes
+
+- `crm.objects.contacts.read` - Read access to contacts
+- `crm.objects.contacts.write` - Write access to contacts
+- `crm.objects.companies.read` - Read access to companies
+- `crm.objects.companies.write` - Write access to companies
+- `crm.objects.deals.read` - Read access to deals
+- `crm.objects.deals.write` - Write access to deals
+
+### Local Setup
+
+Create `local_auth/oauth_configs/hubspot/oauth.json`:
+
+```json
+{
+  "client_id": "xxxxxxxxxxxxxxxxxxxxx",
+  "client_secret": "xxxxxxxxxxxxxxxxxxxxx",
+  "redirect_uri": "xxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+Run authentication:
+
+```bash
+python src/servers/hubspot/main.py auth
+```
+
+## Resources
+
+The server exposes contacts as resources:
+
+| URI | Description |
+|-----|-------------|
+| `hubspot:///contacts/{contact_id}` | Individual contact with all properties |
+
+Contacts are listed with pagination support (20 per page).
+
+## Tools
+
+### Contact Management
+
+<Accordion title="list_contacts">
+List HubSpot contacts with optional search filtering.
+
+**Parameters:**
+- `query` (string, optional): Search query for email addresses
+- `limit` (integer, optional): Maximum number of contacts (default: 10, max: 50)
+- `properties` (array, optional): Specific contact properties to return
+
+**Example:**
+```json
+{
+  "query": "john@example.com",
+  "limit": 20,
+  "properties": ["firstname", "lastname", "email", "phone", "company"]
+}
+```
+
+**Default Properties:** firstname, lastname, email, phone, company, website, jobtitle, address, city, state, zip, country
+</Accordion>
+
+<Accordion title="create_contact">
+Create a new contact in HubSpot.
+
+**Parameters:**
+- `email` (string, required): Email address
+- `firstname` (string, optional): First name
+- `lastname` (string, optional): Last name
+- `phone` (string, optional): Phone number
+- `company` (string, optional): Company name
+- `website` (string, optional): Website URL
+- `jobtitle` (string, optional): Job title
+- `address` (string, optional): Street address
+- `city` (string, optional): City
+- `state` (string, optional): State/province/region
+- `zip` (string, optional): Postal/ZIP code
+- `country` (string, optional): Country
+- `properties` (object, optional): Additional custom properties
+
+**Example:**
+```json
+{
+  "email": "jane.smith@example.com",
+  "firstname": "Jane",
+  "lastname": "Smith",
+  "company": "Acme Corp",
+  "jobtitle": "Marketing Director"
+}
+```
+</Accordion>
+
+<Accordion title="update_contact">
+Update an existing contact's properties.
+
+**Parameters:**
+- `contact_id` (string, required): HubSpot contact ID
+- All other parameters from `create_contact` are optional
+
+**Example:**
+```json
+{
+  "contact_id": "12345",
+  "phone": "+1-555-0123",
+  "jobtitle": "Senior Marketing Director"
+}
+```
+</Accordion>
+
+<Accordion title="search_contacts">
+Search contacts using advanced filters.
+
+**Parameters:**
+- `filter_property` (string, required): Property to filter on (e.g., 'email', 'firstname')
+- `filter_operator` (string, required): Filter operator (e.g., 'EQ', 'CONTAINS_TOKEN', 'GT')
+- `filter_value` (string, required): Value to filter for
+- `limit` (integer, optional): Maximum results (default: 10, max: 50)
+- `properties` (array, optional): Specific properties to return
+
+**Example:**
+```json
+{
+  "filter_property": "jobtitle",
+  "filter_operator": "CONTAINS_TOKEN",
+  "filter_value": "director",
+  "limit": 25
+}
+```
+</Accordion>
+
+### Company Management
+
+<Accordion title="list_companies">
+List HubSpot companies with optional search.
+
+**Parameters:**
+- `query` (string, optional): Search query for company names
+- `limit` (integer, optional): Maximum results (default: 10, max: 50)
+- `properties` (array, optional): Specific properties to return
+
+**Default Properties:** name, domain, description, industry, city, state, country, phone
+</Accordion>
+
+<Accordion title="create_company">
+Create a new company in HubSpot.
+
+**Parameters:**
+- `name` (string, required): Company name
+- `domain` (string, optional): Company website domain
+- `description` (string, optional): Company description
+- `industry` (string, optional): Industry
+- `city` (string, optional): City
+- `state` (string, optional): State/province
+- `country` (string, optional): Country
+- `phone` (string, optional): Phone number
+- `properties` (object, optional): Additional custom properties
+
+**Example:**
+```json
+{
+  "name": "Acme Corporation",
+  "domain": "acme.com",
+  "industry": "Software",
+  "city": "San Francisco"
+}
+```
+</Accordion>
+
+<Accordion title="update_company">
+Update an existing company.
+
+**Parameters:**
+- `company_id` (string, required): HubSpot company ID
+- All other parameters from `create_company` are optional
+
+**Example:**
+```json
+{
+  "company_id": "67890",
+  "description": "Leading provider of enterprise solutions"
+}
+```
+</Accordion>
+
+### Deal Management
+
+<Accordion title="list_deals">
+List HubSpot deals with optional search.
+
+**Parameters:**
+- `query` (string, optional): Search query for deal names
+- `limit` (integer, optional): Maximum results (default: 10, max: 50)
+- `properties` (array, optional): Specific properties to return
+
+**Default Properties:** dealname, amount, dealstage, closedate, pipeline
+</Accordion>
+
+<Accordion title="create_deal">
+Create a new deal in HubSpot.
+
+**Parameters:**
+- `dealname` (string, required): Deal name
+- `amount` (number, optional): Deal amount
+- `dealstage` (string, optional): Deal stage (e.g., 'appointmentscheduled')
+- `pipeline` (string, optional): Pipeline ID
+- `closedate` (string, optional): Expected close date (yyyy-MM-dd)
+- `contact_id` (string, optional): Associated contact ID
+- `company_id` (string, optional): Associated company ID
+- `properties` (object, optional): Additional custom properties
+
+**Example:**
+```json
+{
+  "dealname": "Enterprise Contract Renewal",
+  "amount": 50000,
+  "dealstage": "negotiation",
+  "contact_id": "12345",
+  "company_id": "67890"
+}
+```
+</Accordion>
+
+<Accordion title="update_deal">
+Update an existing deal.
+
+**Parameters:**
+- `deal_id` (string, required): HubSpot deal ID
+- All other parameters from `create_deal` are optional
+
+**Example:**
+```json
+{
+  "deal_id": "98765",
+  "dealstage": "closedwon",
+  "amount": 55000
+}
+```
+</Accordion>
+
+### Engagement Tools
+
+<Accordion title="get_engagements">
+Get engagement data (calls, emails, meetings) for a contact.
+
+**Parameters:**
+- `contact_id` (string, required): HubSpot contact ID
+- `limit` (integer, optional): Maximum engagements to return
+- `engagement_type` (string, optional): Type filter (EMAIL, CALL, MEETING, etc.)
+
+**Example:**
+```json
+{
+  "contact_id": "12345",
+  "limit": 20,
+  "engagement_type": "EMAIL"
+}
+```
+</Accordion>
+
+<Accordion title="send_email">
+Send an email to a HubSpot contact.
+
+**Parameters:**
+- `contact_id` (string, required): HubSpot contact ID
+- `subject` (string, required): Email subject line
+- `body` (string, required): Email body content
+- `from_name` (string, optional): Sender name
+
+**Example:**
+```json
+{
+  "contact_id": "12345",
+  "subject": "Follow-up from our meeting",
+  "body": "Hi, it was great meeting with you yesterday...",
+  "from_name": "Sales Team"
+}
+```
+</Accordion>
+
+## API Reference
+
+Base URL: `https://api.hubapi.com`
+
+The server uses HubSpot's v3 CRM API for most operations. All requests use Bearer token authentication.
+
+## Error Handling
+
+The server provides detailed error messages including:
+- HTTP status codes from HubSpot API
+- Truncated error responses (up to 500 characters)
+- Validation errors for missing required fields

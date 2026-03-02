@@ -1,0 +1,330 @@
+---
+title: "Remote Server (SSE)"
+description: "Run MCP servers remotely using Server-Sent Events transport"
+---
+
+## Overview
+
+The remote server module provides HTTP/SSE (Server-Sent Events) transport for MCP servers, enabling remote access and multi-user support. It automatically discovers and serves all servers in the servers directory.
+
+**Source:** `src/servers/remote.py`
+
+## Main Function
+
+**Source:** `src/servers/remote.py:255`
+
+```python
+def main():
+    """Main entry point for the Starlette server"""
+```
+
+### Command-Line Arguments
+
+<ParamField path="--host" type="string" default="0.0.0.0">
+  Host address for the Starlette server
+</ParamField>
+
+<ParamField path="--port" type="int" default="8000">
+  Port for the Starlette server
+</ParamField>
+
+## Core Functions
+
+### discover_servers
+
+Automatically discovers and loads all servers from the servers directory.
+
+**Source:** `src/servers/remote.py:40`
+
+```python
+def discover_servers():
+    """Discover and load all servers from the servers directory"""
+```
+
+**Behavior:**
+- Scans all directories in `src/servers/`
+- Looks for `main.py` in each directory
+- Loads modules with `server` and `get_initialization_options` attributes
+- Stores loaded servers in global `servers` dictionary
+- Logs successful loads and warnings for invalid servers
+
+### create_starlette_app
+
+Creates a Starlette application with SSE endpoints for all discovered servers.
+
+**Source:** `src/servers/remote.py:102`
+
+```python
+def create_starlette_app():
+    """Create a Starlette app with multiple SSE transports for different servers"""
+```
+
+<ResponseField name="return" type="Starlette">
+  Configured Starlette application with routes for all servers
+</ResponseField>
+
+**Creates routes:**
+- `/{server_name}/{session_key}` - SSE connection endpoint
+- `/{server_name}/{session_key}/messages/` - Message posting endpoint
+- `/` - Root health check
+- `/health_check` - Health check endpoint
+
+### create_metrics_app
+
+Creates a separate Starlette app for Prometheus metrics.
+
+**Source:** `src/servers/remote.py:85`
+
+```python
+def create_metrics_app():
+    """Create a separate Starlette app just for metrics"""
+```
+
+<ResponseField name="return" type="Starlette">
+  Starlette app serving metrics on `/metrics` endpoint
+</ResponseField>
+
+### run_metrics_server
+
+Runs the metrics server on a separate port.
+
+**Source:** `src/servers/remote.py:248`
+
+```python
+def run_metrics_server(host, port):
+    """Run a separate metrics server on the specified port"""
+```
+
+<ParamField path="host" type="str" required>
+  Host address for metrics server
+</ParamField>
+
+<ParamField path="port" type="int" required>
+  Port for metrics server (default: 9091)
+</ParamField>
+
+## API Endpoints
+
+### SSE Connection Endpoint
+
+```
+GET /{server_name}/{session_key}
+```
+
+Establishes an SSE connection for a specific server and user session.
+
+<ParamField path="server_name" type="string" required>
+  Name of the server (e.g., "slack", "github")
+</ParamField>
+
+<ParamField path="session_key" type="string" required>
+  URL-encoded session identifier. For Gumloop: `{user_id}:{api_key}`, otherwise just `{user_id}`
+</ParamField>
+
+**Example:**
+```
+GET /slack/user123:api_key_abc123
+```
+
+### Message Endpoint
+
+```
+POST /{server_name}/{session_key}/messages/
+```
+
+Sends messages to a specific user session.
+
+<ParamField path="server_name" type="string" required>
+  Name of the server
+</ParamField>
+
+<ParamField path="session_key" type="string" required>
+  Session identifier from SSE connection
+</ParamField>
+
+**Response:**
+- `404` - Session not found or expired
+- Handled by SSE transport's `handle_post_message`
+
+### Health Check Endpoints
+
+```
+GET /
+GET /health_check
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "message": "guMCP server running",
+  "servers": ["slack", "github", "simple-tools-server"]
+}
+```
+
+### Metrics Endpoint
+
+```
+GET /metrics
+```
+
+Returns Prometheus metrics (runs on port 9091 by default).
+
+## Metrics
+
+The server tracks Prometheus metrics:
+
+### active_connections
+
+**Source:** `src/servers/remote.py:29`
+
+```python
+active_connections = Gauge(
+    "gumcp_active_connections",
+    "Number of active SSE connections",
+    ["server"]
+)
+```
+
+### connection_total
+
+**Source:** `src/servers/remote.py:32`
+
+```python
+connection_total = Counter(
+    "gumcp_connection_total",
+    "Total number of SSE connections",
+    ["server"]
+)
+```
+
+## Session Management
+
+### User Session Storage
+
+**Source:** `src/servers/remote.py:24-26`
+
+```python
+user_session_transports = {}  # Stores SSE transports per session
+user_server_instances = {}     # Stores server instances per session
+```
+
+**Session Key Format:**
+- With API key: `{server_name}:{user_id}:{api_key}`
+- Without API key: `{server_name}:{user_id}`
+
+**Session Lifecycle:**
+1. SSE connection creates transport and server instance
+2. Server instance is reused for reconnections (maintains state)
+3. Transport is cleaned up when connection closes
+4. Server instance persists for future reconnections
+
+## Usage
+
+### Starting the Server
+
+```bash
+python -m src.servers.remote --host 0.0.0.0 --port 8000
+```
+
+### Custom Port Configuration
+
+```bash
+python -m src.servers.remote --host 127.0.0.1 --port 3000
+```
+
+### Using Environment Variables
+
+```bash
+export GUMLOOP_API_KEY="your-api-key"
+python -m src.servers.remote
+```
+
+## Integration Example
+
+### Python Client
+
+```python
+import httpx
+import json
+
+url = "http://localhost:8000/slack/user123"
+
+async with httpx.AsyncClient() as client:
+    async with client.stream("GET", url) as response:
+        async for line in response.aiter_lines():
+            if line.startswith("data: "):
+                data = json.loads(line[6:])
+                # Process SSE message
+```
+
+### cURL
+
+```bash
+# Connect to SSE endpoint
+curl -N http://localhost:8000/slack/user123
+
+# Send message
+curl -X POST http://localhost:8000/slack/user123/messages/ \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "tools/call", "params": {...}}'
+```
+
+## Logging
+
+**Source:** `src/servers/remote.py:16-19`
+
+```python
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("gumcp-server")
+```
+
+**Key log messages:**
+- Server discovery: `Discovered {count} servers`
+- Server loading: `Loaded server: {server_name}`
+- Connection: `New SSE connection requested for {server_name} with session: {user_id}`
+- Connection established: `SSE connection established for {server_name} session: {user_id}`
+- Connection closed: `Closed SSE connection for {server_name} session: {user_id}`
+
+## Server Requirements
+
+Servers must follow this structure:
+
+```python
+# src/servers/my-server/main.py
+
+def server(user_id: str, api_key: str = None):
+    """Factory function that creates server instances"""
+    srv = Server("my-server")
+    # Configure server with user_id and api_key
+    return srv
+
+def get_initialization_options(server_instance):
+    """Return initialization options"""
+    return {
+        "serverInfo": {
+            "name": "my-server",
+            "version": "1.0.0"
+        }
+    }
+```
+
+## Configuration
+
+### Metrics Port
+
+**Source:** `src/servers/remote.py:37`
+
+```python
+METRICS_PORT = 9091
+```
+
+The metrics server always runs on port 9091, separate from the main server port.
+
+## See Also
+
+- [Local Server (stdio)](/api/servers/local) - Local stdin/stdout transport
+- [Main Server Entry Point](/api/servers/main) - Server launcher

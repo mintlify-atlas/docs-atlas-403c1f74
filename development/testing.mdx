@@ -1,0 +1,367 @@
+---
+title: Testing Guide
+description: How to write and run tests for guMCP servers
+---
+
+This guide covers testing MCP servers in guMCP, including writing tests, using test clients, and running the test suite.
+
+## Test Structure
+
+All server tests follow a consistent structure:
+
+```
+tests/
+├── servers/
+│   ├── conftest.py           # Pytest configuration and fixtures
+│   ├── test_runner.py        # Test runner script
+│   └── your-server/
+│       └── tests.py          # Server-specific tests
+└── clients/
+    ├── LocalMCPTestClient.py  # Local stdio test client
+    └── RemoteMCPTestClient.py # Remote SSE test client
+```
+
+## Running Tests
+
+Use the test runner from the project root directory:
+
+### Local Testing (stdio)
+
+```bash
+python tests/servers/test_runner.py --server=simple-tools-server
+```
+
+### Remote Testing (SSE)
+
+<Tabs>
+  <Tab title="Local SSE Server">
+    First, start the SSE development server:
+    ```bash
+    ./start_sse_dev_server.sh
+    ```
+
+    Then run tests:
+    ```bash
+    python tests/servers/test_runner.py --server=simple-tools-server --remote
+    ```
+  </Tab>
+
+  <Tab title="Hosted Server">
+    Test against a hosted guMCP server:
+    ```bash
+    python tests/servers/test_runner.py \
+      --server=simple-tools-server \
+      --remote \
+      --endpoint=https://mcp.gumloop.com/your-server/{user_id}%3A{api_key}
+    ```
+  </Tab>
+</Tabs>
+
+## Writing Tests
+
+### Basic Test Structure
+
+Create `tests/servers/your-server/tests.py`:
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_your_feature(client):
+    """Test description following the pattern test_<functionality>_<expected_behavior>"""
+    # Arrange
+    key = "test_key"
+    value = "test_value"
+
+    # Act
+    response = await client.process_query(
+        f"Store the key '{key}' with value '{value}'"
+    )
+
+    # Assert
+    assert key in response, f"Key '{key}' not found in response: {response}"
+    assert value in response, f"Value '{value}' not found in response: {response}"
+    print(f"✅ Test passed: {key}={value}")
+```
+
+### Using the Client Fixture
+
+The `client` fixture is automatically provided by `conftest.py` and gives you access to test client methods:
+
+```python
+@pytest.mark.asyncio
+async def test_with_client(client):
+    # Send natural language query to LLM that uses your MCP tools
+    response = await client.process_query("List all stored data")
+
+    # Make assertions about the response
+    assert "data" in response.lower()
+```
+
+<Note>
+  The test client uses Claude (via Anthropic API) to interact with your MCP server naturally. You need `ANTHROPIC_API_KEY` in your `.env` file.
+</Note>
+
+### Real-World Test Example
+
+From `tests/servers/simple-tools-server/tests.py`:
+
+```python
+@pytest.mark.asyncio
+async def test_store_data(client):
+    """Test the store-data tool"""
+    key = "test_key"
+    value = "test_value"
+
+    response = await client.process_query(
+        f"Store the key '{key}' with value '{value}'"
+    )
+
+    # Simple verification: check if both key and value appear in response
+    assert key in response, f"Key '{key}' not found in response: {response}"
+    assert value in response, f"Value '{value}' not found in response: {response}"
+    print(f"✅ Data stored successfully: {key}={value}")
+
+@pytest.mark.asyncio
+async def test_retrieve_existing_data(client):
+    """Test retrieving existing data"""
+    key = "test_key"
+    expected = "test_value"
+
+    # First store the data
+    await client.process_query(
+        f"Store the key '{key}' with value '{expected}'"
+    )
+
+    # Then retrieve it
+    response = await client.process_query(f"Get the value for key '{key}'")
+
+    assert expected in response, \
+        f"Expected value '{expected}' not found in response: {response}"
+    print(f"✅ Retrieved existing data: {key}={expected}")
+
+@pytest.mark.asyncio
+async def test_retrieve_nonexistent_data(client):
+    """Test retrieving non-existent data"""
+    key = "non_existent_key"
+
+    response = await client.process_query(
+        f"Get the value for key '{key}'. "
+        f"Respond with 'not found' if it couldn't be found."
+    )
+
+    assert "not found" in response.lower(), \
+        f"Expected 'not found' message, got: {response}"
+    print(f"✅ Correctly handled non-existent key: {key}")
+```
+
+## Test Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Clear Test Names" icon="tag">
+    Use descriptive names following `test_<functionality>_<expected_behavior>`
+  </Card>
+
+  <Card title="Include Integration Tests" icon="link">
+    Have tests that do NOT use mocks and require actual authentication to verify end-to-end functionality
+  </Card>
+
+  <Card title="Helpful Assertions" icon="check">
+    Include descriptive error messages in assertions to aid debugging
+  </Card>
+
+  <Card title="Print Success Messages" icon="comment">
+    Use print statements to show progress when tests pass
+  </Card>
+</CardGroup>
+
+### Test Organization
+
+```python
+import pytest
+
+# Group related tests together
+
+# Create/Write operations
+@pytest.mark.asyncio
+async def test_create_item(client):
+    pass
+
+@pytest.mark.asyncio
+async def test_update_item(client):
+    pass
+
+# Read operations
+@pytest.mark.asyncio
+async def test_retrieve_item(client):
+    pass
+
+@pytest.mark.asyncio
+async def test_list_items(client):
+    pass
+
+# Error handling
+@pytest.mark.asyncio
+async def test_error_missing_params(client):
+    pass
+```
+
+## Manual Testing with Test Clients
+
+For sandbox/interactive testing, you can use the test clients directly:
+
+### Local MCP Test Client
+
+```python
+from tests.clients.LocalMCPTestClient import LocalMCPTestClient
+
+client = LocalMCPTestClient()
+await client.connect_to_server_by_name("your-server")
+
+# Interactive chat loop starts
+# Type queries to test your server
+```
+
+### Remote MCP Test Client
+
+```python
+from tests.clients.RemoteMCPTestClient import RemoteMCPTestClient
+
+client = RemoteMCPTestClient()
+await client.connect_to_server("http://localhost:8000/your-server/local")
+
+# Interactive chat loop starts
+```
+
+<Warning>
+  Both test clients require `ANTHROPIC_API_KEY` in your `.env` file to function.
+</Warning>
+
+## Test Configuration
+
+The `tests/servers/conftest.py` provides pytest configuration:
+
+```python
+import pytest
+import pytest_asyncio
+
+def pytest_addoption(parser):
+    """Add command-line options for tests"""
+    parser.addoption(
+        "--remote",
+        action="store_true",
+        help="Run tests in remote mode",
+    )
+    parser.addoption(
+        "--endpoint",
+        action="store",
+        default=None,
+        help="URL for the remote server endpoint",
+    )
+
+@pytest_asyncio.fixture(scope="function")
+async def client(request):
+    """Fixture to provide a connected client for all tests"""
+    # Automatically provides LocalMCPTestClient or RemoteMCPTestClient
+    # based on --remote flag
+```
+
+## pytest Options
+
+The test runner uses these pytest options:
+
+- `-v` - Verbose output
+- `--capture=no` - Show print statements
+- `-p no:warnings` - Disable warning capture
+- `--import-mode=importlib` - Use importlib for imports
+
+## Debugging Tests
+
+### View Detailed Output
+
+```bash
+python tests/servers/test_runner.py --server=your-server -v
+```
+
+### Run Specific Tests
+
+```bash
+python tests/servers/test_runner.py \
+  --server=your-server \
+  -k test_specific_function
+```
+
+### Stop on First Failure
+
+```bash
+python tests/servers/test_runner.py --server=your-server -x
+```
+
+## Testing Requirements
+
+From `requirements-dev.txt`:
+
+```txt
+pytest>=7.4.0
+pytest-asyncio>=0.21.1
+pytest-timeout
+pytest-mock==3.11.1
+```
+
+## Writing Test Assertions
+
+### Good Practices
+
+```python
+# Good: Descriptive error messages
+assert key in response, f"Key '{key}' not found in response: {response}"
+
+# Good: Clear expectations
+assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+
+# Good: Check specific conditions
+assert "error" not in response.lower(), "Unexpected error in response"
+```
+
+### Avoid
+
+```python
+# Bad: No error message
+assert key in response
+
+# Bad: Vague assertion
+assert response
+
+# Bad: Testing too many things at once
+assert key in response and value in response and "success" in response
+```
+
+## Pre-Submission Checklist
+
+Before submitting a PR, ensure:
+
+<Steps>
+  <Step title="All tests pass">
+    ```bash
+    python tests/servers/test_runner.py --server=your-server
+    ```
+  </Step>
+
+  <Step title="Tests cover new functionality">
+    Every new tool, resource, or prompt should have corresponding tests
+  </Step>
+
+  <Step title="Include integration tests">
+    At least some tests should run without mocks and require actual authentication
+  </Step>
+
+  <Step title="Tests are documented">
+    Each test has a clear docstring explaining what it tests
+  </Step>
+</Steps>
+
+## Next Steps
+
+- Review [Code Style](/development/code-style) for code quality standards
+- See [Creating Servers](/development/creating-servers) for implementation patterns
+- Read [Contributing Guidelines](/development/contributing) before submitting

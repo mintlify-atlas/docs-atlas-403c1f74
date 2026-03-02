@@ -1,80 +1,315 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get up and running with guMCP in minutes
 ---
 
-## Get started in three steps
-
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will help you quickly set up and run your first guMCP server.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+Make sure you've completed the [Installation](/installation) steps before proceeding.
 </Note>
+
+## Understanding guMCP Architecture
+
+guMCP supports two transport methods:
+
+- **SSE (Server-Sent Events)** - Remote servers accessible via HTTP
+- **Stdio** - Local servers that communicate via standard input/output
+
+<Tip>
+For most use cases, we recommend starting with SSE servers as they provide a single URL to access all available servers.
+</Tip>
+
+## Running Your First Server
+
+<Steps>
+  <Step title="Start the SSE development server">
+    From the project root directory, run:
+
+    ```bash
+    ./start_sse_dev_server.sh
+    ```
+
+    This script will:
+    1. Load environment variables from your `.env` file
+    2. Set default host (`0.0.0.0`) and port (`8000`) if not configured
+    3. Kill any existing process on the port
+    4. Start the guMCP server
+
+    You should see output like:
+
+    ```bash
+    Loading environment variables from .env file
+    Starting guMCP development server on 0.0.0.0:8000
+    INFO:     Started server process
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://0.0.0.0:8000
+    ```
+  </Step>
+
+  <Step title="Test the server with the MCP client">
+    Open a new terminal window (keep the server running in the first), activate your virtual environment, and run:
+
+    ```bash
+    python tests/clients/RemoteMCPTestClient.py --endpoint=http://localhost:8000/simple-tools-server/local
+    ```
+
+    This launches an interactive MCP client connected to the `simple-tools-server`.
+
+    <Note>
+    Make sure you have set your `ANTHROPIC_API_KEY` in your `.env` file for the test client to work.
+    </Note>
+  </Step>
+
+  <Step title="Try a simple command">
+    In the test client, you can now interact with the MCP server through Claude. Try asking:
+
+    ```
+    What tools are available?
+    ```
+
+    Or test a simple tool:
+
+    ```
+    Add 5 and 3
+    ```
+
+    Type `quit` or press `Ctrl+C` to exit the client.
+  </Step>
+</Steps>
+
+## Running Different Servers
+
+### Available Servers
+
+guMCP includes multiple server implementations:
+
+- `simple-tools-server` - Basic tools for testing
+- `gsheets` - Google Sheets integration
+- `gmail` - Gmail integration
+- `gdocs` - Google Docs integration
+- `gdrive` - Google Drive integration
+- `gcalendar` - Google Calendar integration
+- `slack` - Slack integration
+- `outlook` - Outlook integration
+- `airtable` - Airtable integration
+- `linear` - Linear integration
+- `attio` - Attio CRM integration
+- `perplexity` - Perplexity AI integration
+- `hubspot` - HubSpot integration
+- `quickbooks` - QuickBooks integration
+- `typeform` - Typeform integration
+
+### SSE Server Access
+
+When running the SSE server, all servers are accessible at:
+
+```
+http://localhost:8000/{server-name}/local
+```
+
+For example:
+- `http://localhost:8000/simple-tools-server/local`
+- `http://localhost:8000/perplexity/local`
+- `http://localhost:8000/slack/local`
+
+### Running Stdio Servers
+
+To run a specific server locally using stdio:
+
+```bash
+python src/servers/local.py --server=simple-tools-server
+```
+
+You can also use the local test client:
+
+```bash
+python tests/clients/LocalMCPTestClient.py --server=simple-tools-server
+```
+
+## Configuring Authentication
+
+Many servers require authentication before they can be used. Let's configure the Perplexity server as an example:
+
+<Steps>
+  <Step title="Get your API key">
+    Sign up for a Perplexity API key at [perplexity.ai](https://www.perplexity.ai/)
+  </Step>
+
+  <Step title="Run the authentication command">
+    ```bash
+    python src/servers/perplexity/main.py auth
+    ```
+
+    You'll be prompted to enter your Perplexity API key.
+  </Step>
+
+  <Step title="Test the authenticated server">
+    Start the SSE server and connect to the Perplexity endpoint:
+
+    ```bash
+    # In terminal 1
+    ./start_sse_dev_server.sh
+
+    # In terminal 2
+    python tests/clients/RemoteMCPTestClient.py --endpoint=http://localhost:8000/perplexity/local
+    ```
+  </Step>
+</Steps>
+
+<Info>
+For OAuth-based servers (Google, Slack, etc.), see the individual server documentation in `src/servers/{server-name}/README.md` for authentication setup instructions.
+</Info>
+
+## Connecting to Claude Desktop
+
+To use guMCP servers with Claude Desktop:
+
+<Steps>
+  <Step title="Start your SSE server">
+    ```bash
+    ./start_sse_dev_server.sh
+    ```
+  </Step>
+
+  <Step title="Configure Claude Desktop">
+    Open your Claude Desktop configuration file:
+
+    <CodeGroup>
+    ```bash macOS
+    ~/Library/Application\ Support/Claude/claude_desktop_config.json
+    ```
+
+    ```bash Windows
+    %APPDATA%/Claude/claude_desktop_config.json
+    ```
+
+    ```bash Linux
+    ~/.config/Claude/claude_desktop_config.json
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add the MCP server configuration">
+    Add your guMCP server to the configuration:
+
+    ```json
+    {
+      "mcpServers": {
+        "simple-tools": {
+          "command": "python",
+          "args": [
+            "/absolute/path/to/guMCP/src/servers/local.py",
+            "--server=simple-tools-server"
+          ]
+        }
+      }
+    }
+    ```
+
+    <Warning>
+    Replace `/absolute/path/to/guMCP` with the actual path to your guMCP installation.
+    </Warning>
+  </Step>
+
+  <Step title="Restart Claude Desktop">
+    Restart Claude Desktop to load the new configuration. You should now see your MCP server available in Claude.
+  </Step>
+</Steps>
+
+## Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="Running multiple servers simultaneously">
+    The SSE server runs all servers at once. Simply start it and access different servers via their respective endpoints:
+
+    ```bash
+    ./start_sse_dev_server.sh
+    ```
+
+    Then connect to any server:
+    - `http://localhost:8000/simple-tools-server/local`
+    - `http://localhost:8000/perplexity/local`
+    - `http://localhost:8000/gsheets/local`
+  </Accordion>
+
+  <Accordion title="Running on a custom port">
+    Set the `GUMCP_PORT` environment variable:
+
+    ```bash
+    GUMCP_PORT=3000 ./start_sse_dev_server.sh
+    ```
+
+    Or add it to your `.env` file:
+
+    ```bash
+    GUMCP_PORT=3000
+    ```
+  </Accordion>
+
+  <Accordion title="Accessing from remote machines">
+    By default, the server listens on `0.0.0.0`, making it accessible from other machines on your network. To restrict to localhost only:
+
+    ```bash
+    GUMCP_HOST=127.0.0.1 ./start_sse_dev_server.sh
+    ```
+  </Accordion>
+
+  <Accordion title="Running in production">
+    For production deployments, consider:
+    1. Setting `ENVIRONMENT=production` in your `.env`
+    2. Using a process manager like systemd or PM2
+    3. Running behind a reverse proxy (nginx, Caddy)
+    4. Enabling HTTPS with proper SSL certificates
+    5. Implementing rate limiting and authentication
+
+    See the [Configuration](/configuration) guide for production settings.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Server won't start">
+    Check if:
+    1. Your virtual environment is activated
+    2. All dependencies are installed: `pip install -r requirements.txt`
+    3. The port isn't already in use by another application
+    4. Your `.env` file exists and is properly formatted
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    For authentication issues:
+    1. Verify your API keys are correctly set in `.env`
+    2. Run the server-specific auth command (e.g., `python src/servers/perplexity/main.py auth`)
+    3. Check that OAuth credentials are stored in `local_auth/credentials/`
+    4. Ensure OAuth configuration files exist in `local_auth/oauth_configs/`
+  </Accordion>
+
+  <Accordion title="Test client connection failures">
+    If the test client can't connect:
+    1. Ensure the SSE server is running
+    2. Verify the endpoint URL is correct
+    3. Check that `ANTHROPIC_API_KEY` is set in your `.env`
+    4. Try accessing the endpoint in a browser to see if it responds
+  </Accordion>
+
+  <Accordion title="Import errors">
+    If you see module import errors:
+    1. Make sure you're running commands from the project root
+    2. Verify your virtual environment is activated
+    3. Try reinstalling dependencies: `pip install -r requirements.txt --force-reinstall`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Learn about all configuration options and environment variables
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="https://github.com/gumloop/guMCP/blob/main/CONTRIBUTING.MD">
+    Contribute to guMCP by adding new servers or features
+  </Card>
+</CardGroup>

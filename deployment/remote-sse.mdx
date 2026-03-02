@@ -1,0 +1,363 @@
+---
+title: 'Remote SSE Deployment'
+description: 'Run guMCP servers remotely using Server-Sent Events (SSE) transport'
+---
+
+SSE (Server-Sent Events) transport allows you to run MCP servers remotely and access them over HTTP. This is ideal for production deployments, remote access, and web-based clients.
+
+## Overview
+
+When running in SSE mode:
+- All servers are hosted on a single HTTP endpoint
+- Multiple users can connect simultaneously
+- Each user gets isolated server instances
+- Communication happens over HTTP with Server-Sent Events
+- Suitable for remote access and production deployments
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Python 3.11">
+    Ensure you have Python 3.11 or higher installed on your system.
+  </Step>
+  
+  <Step title="Clone and setup the repository">
+    ```bash
+    git clone https://github.com/gumloop/guMCP.git
+    cd guMCP
+    ```
+  </Step>
+  
+  <Step title="Create virtual environment">
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
+  </Step>
+  
+  <Step title="Install dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  
+  <Step title="Configure environment variables">
+    ```bash
+    cp .env.example .env
+    # Edit .env with your configuration
+    ```
+    
+    See [Environment Setup](/deployment/environment-setup) for details.
+  </Step>
+</Steps>
+
+## Starting the SSE Server
+
+### Using the Development Script
+
+The easiest way to start the SSE server is using the provided script:
+
+```bash
+./start_sse_dev_server.sh
+```
+
+This script:
+- Loads environment variables from `.env`
+- Sets default host (`0.0.0.0`) and port (`8000`) if not specified
+- Kills any existing process on the port
+- Starts the development server
+
+### Manual Start
+
+You can also start the server manually:
+
+```bash
+python src/servers/main.py
+```
+
+With custom host and port:
+
+```bash
+python src/servers/main.py --host=0.0.0.0 --port=8080
+```
+
+## Server Configuration
+
+### Environment Variables
+
+Configure the server using environment variables in your `.env` file:
+
+```bash
+# Server host (default: 0.0.0.0)
+GUMCP_HOST=0.0.0.0
+
+# Server port (default: 8000)
+GUMCP_PORT=8000
+
+# Environment setting
+ENVIRONMENT=local
+```
+
+### Script Behavior
+
+The `start_sse_dev_server.sh` script:
+
+1. **Loads environment variables** from `.env` if it exists
+2. **Sets defaults** if variables are not defined:
+   - `GUMCP_HOST=0.0.0.0`
+   - `GUMCP_PORT=8000`
+3. **Checks for port conflicts** using `lsof`
+4. **Kills existing processes** on the port if needed
+5. **Starts the server** with `python src/servers/main.py`
+
+## Server Architecture
+
+### Automatic Server Discovery
+
+The SSE server automatically discovers all available servers from the `src/servers/` directory. Each server must have:
+- A `main.py` file
+- A `server` factory function
+- A `get_initialization_options` function
+
+### Multi-User Sessions
+
+The server supports isolated sessions per user:
+- **Session keys**: Identified by `{user_id}:{api_key}` or just `{user_id}`
+- **Server instances**: Each session gets its own server instance
+- **State preservation**: Server instances are reused across reconnections
+- **Automatic cleanup**: Transports are cleaned up when connections close
+
+## Connecting to the Server
+
+### Endpoint Format
+
+Servers are accessible at:
+
+```
+http://{host}:{port}/{server-name}/{session-key}
+```
+
+Examples:
+- `http://localhost:8000/simple-tools-server/local`
+- `http://localhost:8000/gsheets/user123:api_key_456`
+
+### Using the Remote Test Client
+
+guMCP provides a test client for SSE servers:
+
+```bash
+python tests/clients/RemoteMCPTestClient.py --endpoint=http://localhost:8000/simple-tools-server/local
+```
+
+This client:
+- Connects to the specified SSE endpoint
+- Handles Server-Sent Events
+- Provides an interactive testing interface
+- Useful for development and debugging
+
+### Using with Cursor or Other Clients
+
+Configure your MCP client to connect to the SSE endpoint:
+
+```json
+{
+  "mcpServers": {
+    "gsheets-remote": {
+      "url": "http://your-server.com:8000/gsheets/your-session-key"
+    }
+  }
+}
+```
+
+## Available Endpoints
+
+### Server Endpoints
+
+For each discovered server:
+
+- **SSE Connection**: `GET /{server-name}/{session-key}`
+  - Establishes SSE connection for the session
+  - Returns a stream of Server-Sent Events
+
+- **Post Messages**: `POST /{server-name}/{session-key}/messages/`
+  - Send messages to the server
+  - Used by clients to communicate with the server
+
+### Health Check Endpoints
+
+- **Root**: `GET /`
+  - Returns server status and list of available servers
+  - Response: `{"status": "ok", "message": "guMCP server running", "servers": [...]}`
+
+- **Health Check**: `GET /health_check`
+  - Returns health status and available servers
+  - Response: `{"status": "ok", "servers": [...]}`
+
+### Metrics Endpoint
+
+- **Prometheus Metrics**: `GET /metrics` (on port 9091)
+  - Exposes Prometheus-compatible metrics
+  - Includes:
+    - `gumcp_active_connections`: Active SSE connections per server
+    - `gumcp_connection_total`: Total connections per server
+
+## Monitoring
+
+### Prometheus Metrics
+
+The server exposes Prometheus metrics on port `9091`:
+
+```bash
+curl http://localhost:9091/metrics
+```
+
+Metrics include:
+- **Active connections** by server
+- **Total connections** by server
+- Standard Prometheus process metrics
+
+### Logging
+
+The server provides comprehensive logging:
+
+```
+2024-01-15 10:30:00 - gumcp-server - INFO - Looking for servers in /path/to/servers
+2024-01-15 10:30:00 - gumcp-server - INFO - Loaded server: simple-tools-server
+2024-01-15 10:30:00 - gumcp-server - INFO - Discovered 10 servers
+2024-01-15 10:30:00 - gumcp-server - INFO - Starting Starlette server on 0.0.0.0:8000
+2024-01-15 10:30:00 - gumcp-server - INFO - Starting Metrics server on 0.0.0.0:9091
+```
+
+## Production Deployment
+
+### Using a Process Manager
+
+For production, use a process manager like systemd or supervisor:
+
+#### systemd Example
+
+Create `/etc/systemd/system/gumcp.service`:
+
+```ini
+[Unit]
+Description=guMCP SSE Server
+After=network.target
+
+[Service]
+Type=simple
+User=gumcp
+WorkingDirectory=/opt/guMCP
+Environment=PATH=/opt/guMCP/venv/bin
+EnvironmentFile=/opt/guMCP/.env
+ExecStart=/opt/guMCP/venv/bin/python src/servers/main.py --host=0.0.0.0 --port=8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable gumcp
+sudo systemctl start gumcp
+```
+
+### Using Docker
+
+Create a `Dockerfile`:
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000 9091
+
+CMD ["python", "src/servers/main.py", "--host=0.0.0.0", "--port=8000"]
+```
+
+Build and run:
+
+```bash
+docker build -t gumcp .
+docker run -d -p 8000:8000 -p 9091:9091 --env-file .env gumcp
+```
+
+### Reverse Proxy with nginx
+
+For production, use nginx as a reverse proxy:
+
+```nginx
+server {
+    listen 80;
+    server_name mcp.example.com;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # SSE specific settings
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 86400s;
+    }
+}
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+If the port is already in use:
+
+```bash
+# Find process using the port
+lsof -i :8000
+
+# Kill the process
+kill -9 <PID>
+
+# Or use the start script which does this automatically
+./start_sse_dev_server.sh
+```
+
+### Connection Refused
+
+If clients cannot connect:
+1. Verify the server is running: `curl http://localhost:8000/health_check`
+2. Check firewall settings
+3. Ensure the host is set to `0.0.0.0` for external access
+4. Verify the correct port is being used
+
+### Session Not Found
+
+If you get "Session not found or expired":
+1. Ensure you're using the correct session key format
+2. Check that the SSE connection is established before posting messages
+3. Verify the server name is correct
+
+### Server Not Loading
+
+If servers are not discovered:
+1. Check that the server directory has a `main.py` file
+2. Verify the `main.py` exports `server` and `get_initialization_options`
+3. Check server logs for loading errors
+
+## Next Steps
+
+- [Local Stdio Deployment](/deployment/local-stdio) - Run servers locally
+- [Environment Setup](/deployment/environment-setup) - Configure environment variables
+- [Server Documentation](/servers/overview) - Learn about available servers

@@ -1,0 +1,116 @@
+---
+title: "BaseAuthClient"
+description: "Abstract base class for authentication clients"
+---
+
+## Overview
+
+`BaseAuthClient` is an abstract base class that defines the interface for authentication clients in guMCP. It uses Python generics to work with any type of credentials object.
+
+**Source:** `src/auth/clients/BaseAuthClient.py:8`
+
+## Class Definition
+
+```python
+from typing import Dict, Any, Optional, TypeVar, Generic
+
+CredentialsT = TypeVar("CredentialsT")
+
+class BaseAuthClient(Generic[CredentialsT], abc.ABC):
+    """Abstract base class for authentication clients."""
+```
+
+## Methods
+
+### get_user_credentials
+
+Retrieves user credentials for a specific service. Credentials returned are ready-to-use (e.g., access tokens are already refreshed).
+
+**Source:** `src/auth/clients/BaseAuthClient.py:15`
+
+```python
+@abc.abstractmethod
+def get_user_credentials(
+    self, service_name: str, user_id: str
+) -> Optional[CredentialsT]:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service (e.g., "gdrive", "github", "slack")
+</ParamField>
+
+<ParamField path="user_id" type="str" required>
+  Identifier for the user
+</ParamField>
+
+<ResponseField name="return" type="Optional[CredentialsT]">
+  Credentials object if found, None otherwise
+</ResponseField>
+
+### get_oauth_config
+
+Retrieves OAuth configuration for a specific service.
+
+**Source:** `src/auth/clients/BaseAuthClient.py:30`
+
+```python
+def get_oauth_config(self, service_name: str) -> Dict[str, Any]:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service (e.g., "gdrive", "github", "slack")
+</ParamField>
+
+<ResponseField name="return" type="Dict[str, Any]">
+  Dictionary containing OAuth configuration (client_id, client_secret, etc.)
+</ResponseField>
+
+<Note>
+  This method is optional and raises `NotImplementedError` by default.
+</Note>
+
+### save_user_credentials
+
+Saves user credentials after authentication or refresh.
+
+**Source:** `src/auth/clients/BaseAuthClient.py:44`
+
+```python
+def save_user_credentials(
+    self, service_name: str, user_id: str, credentials: CredentialsT
+) -> None:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service (e.g., "gdrive", "github", "slack")
+</ParamField>
+
+<ParamField path="user_id" type="str" required>
+  Identifier for the user
+</ParamField>
+
+<ParamField path="credentials" type="CredentialsT" required>
+  Credentials object to save
+</ParamField>
+
+<Note>
+  This method is optional and raises `NotImplementedError` by default.
+</Note>
+
+## Type Variables
+
+<ResponseField name="CredentialsT" type="TypeVar">
+  Generic type variable representing any type of credentials object
+</ResponseField>
+
+## Implementation Notes
+
+- All implementations must override `get_user_credentials()` as it's marked with `@abc.abstractmethod`
+- `get_oauth_config()` and `save_user_credentials()` are optional methods that should be implemented based on the client's needs
+- The generic type `CredentialsT` allows flexibility in credential storage formats across different implementations
+
+## See Also
+
+- [LocalAuthClient](/api/auth/local-client) - File-based implementation
+- [GumloopAuthClient](/api/auth/gumloop-client) - Gumloop API implementation
+- [create_auth_client()](/api/auth/factory) - Factory function for creating auth clients

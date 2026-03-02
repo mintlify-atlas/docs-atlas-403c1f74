@@ -1,0 +1,335 @@
+---
+title: "OAuth Utilities"
+description: "Generic OAuth flow handlers and token management"
+---
+
+## Overview
+
+The OAuth utilities module provides generic, reusable functions for handling OAuth 2.0 authentication flows, token refresh, and PKCE (Proof Key for Code Exchange) operations.
+
+**Source:** `src/utils/oauth/util.py`
+
+## Core Functions
+
+### run_oauth_flow
+
+Generic OAuth flow handler that can be used by different services.
+
+**Source:** `src/utils/oauth/util.py:84`
+
+```python
+def run_oauth_flow(
+    service_name: str,
+    user_id: str,
+    scopes: List[str],
+    auth_url_base: str,
+    token_url: str,
+    auth_params_builder: Callable[[Dict[str, Any], str, List[str]], Dict[str, str]],
+    token_data_builder: Callable[[Dict[str, Any], str, List[str], str], Dict[str, str]],
+    process_token_response: Callable[[Dict[str, Any]], Dict[str, Any]] = None,
+    token_header_builder: Callable[[Dict[str, Any]], Dict[str, str]] = None,
+    port: int = 8080,
+) -> Dict[str, Any]:
+```
+
+<ParamField path="service_name" type="str" required>
+  Name of the service (e.g., "microsoft", "slack")
+</ParamField>
+
+<ParamField path="user_id" type="str" required>
+  ID of the user authenticating
+</ParamField>
+
+<ParamField path="scopes" type="List[str]" required>
+  List of OAuth scopes to request
+</ParamField>
+
+<ParamField path="auth_url_base" type="str" required>
+  Base authorization URL for the service
+</ParamField>
+
+<ParamField path="token_url" type="str" required>
+  Token exchange URL for the service
+</ParamField>
+
+<ParamField path="auth_params_builder" type="Callable" required>
+  Function to build auth URL parameters. Signature: `(oauth_config, redirect_uri, scopes) -> Dict[str, str]`
+</ParamField>
+
+<ParamField path="token_data_builder" type="Callable" required>
+  Function to build token request data. Signature: `(oauth_config, redirect_uri, scopes, auth_code) -> Dict[str, str]`
+</ParamField>
+
+<ParamField path="process_token_response" type="Callable">
+  Optional function to process token response. Signature: `(token_response) -> Dict[str, Any]`
+</ParamField>
+
+<ParamField path="token_header_builder" type="Callable">
+  Optional function to build token request headers. Signature: `(oauth_config) -> Dict[str, str]`
+</ParamField>
+
+<ParamField path="port" type="int" default="8080">
+  Port to use for local callback server
+</ParamField>
+
+<ResponseField name="return" type="Dict[str, Any]">
+  Dictionary containing the OAuth credentials including access_token, refresh_token, and expires_at
+</ResponseField>
+
+**Behavior:**
+1. Gets OAuth config from auth client
+2. Starts local HTTP server for callback
+3. Opens browser for user authorization
+4. Waits for callback (120 second timeout)
+5. Exchanges authorization code for tokens
+6. Saves credentials using auth client
+
+### refresh_token_if_needed
+
+Checks if token needs refresh and handles the refresh process.
+
+**Source:** `src/utils/oauth/util.py:210`
+
+```python
+async def refresh_token_if_needed(
+    user_id: str,
+    service_name: str,
+    token_url: str,
+    token_data_builder: Callable[[Dict[str, Any], str, Dict[str, Any]], Dict[str, str]],
+    process_token_response: Callable[[Dict[str, Any]], Dict[str, Any]] = None,
+    token_header_builder: Callable[[Dict[str, Any]], Dict[str, str]] = None,
+    api_key: Optional[str] = None,
+    return_full_credentials: Optional[bool] = False,
+) -> str:
+```
+
+<ParamField path="user_id" type="str" required>
+  ID of the user
+</ParamField>
+
+<ParamField path="service_name" type="str" required>
+  Name of the service
+</ParamField>
+
+<ParamField path="token_url" type="str" required>
+  URL for token refresh
+</ParamField>
+
+<ParamField path="token_data_builder" type="Callable" required>
+  Function to build token refresh request data. Signature: `(oauth_config, refresh_token, credentials_data) -> Dict[str, str]`
+</ParamField>
+
+<ParamField path="process_token_response" type="Callable">
+  Optional function to process token response
+</ParamField>
+
+<ParamField path="token_header_builder" type="Callable">
+  Optional function to build token request headers
+</ParamField>
+
+<ParamField path="api_key" type="Optional[str]">
+  Optional API key for auth client
+</ParamField>
+
+<ParamField path="return_full_credentials" type="bool" default="False">
+  If True, returns full credentials dict; if False, returns only access_token
+</ParamField>
+
+<ResponseField name="return" type="str | Dict[str, Any]">
+  Access token string if `return_full_credentials=False`, otherwise full credentials dictionary
+</ResponseField>
+
+**Behavior:**
+1. Gets credentials from auth client
+2. Checks if token has expired or will expire in 5 minutes
+3. Refreshes token if needed (only in local environment)
+4. Saves updated credentials
+5. Returns access token or full credentials
+
+### generate_code_verifier
+
+Generates a code verifier for PKCE.
+
+**Source:** `src/utils/oauth/util.py:319`
+
+```python
+def generate_code_verifier() -> str:
+```
+
+<ResponseField name="return" type="str">
+  Cryptographically secure random string of 64 characters using a-z, A-Z, 0-9, ".", "-", and "_"
+</ResponseField>
+
+### generate_code_challenge
+
+Generates a code challenge from the code verifier.
+
+**Source:** `src/utils/oauth/util.py:331`
+
+```python
+def generate_code_challenge(code_verifier: str) -> str:
+```
+
+<ParamField path="code_verifier" type="str" required>
+  The code verifier string
+</ParamField>
+
+<ResponseField name="return" type="str">
+  Base64 URL-encoded SHA-256 hash of the code verifier with padding removed
+</ResponseField>
+
+## OAuthCallbackHandler
+
+HTTP request handler for OAuth callback.
+
+**Source:** `src/utils/oauth/util.py:22`
+
+```python
+class OAuthCallbackHandler(BaseHTTPRequestHandler):
+    """HTTP request handler for OAuth callback."""
+```
+
+### do_GET
+
+Handles GET requests with OAuth callback.
+
+**Source:** `src/utils/oauth/util.py:25`
+
+```python
+def do_GET(self):
+```
+
+**Behavior:**
+- Parses query parameters from callback URL
+- Extracts authorization code or error
+- Parses state parameter for code_verifier (PKCE)
+- Stores additional parameters from callback
+- Returns HTML page with success/error message
+
+## Example Usage
+
+### Basic OAuth Flow
+
+```python
+from src.utils.oauth.util import run_oauth_flow
+
+def build_auth_params(oauth_config, redirect_uri, scopes):
+    return {
+        "client_id": oauth_config["client_id"],
+        "redirect_uri": redirect_uri,
+        "scope": " ".join(scopes),
+        "response_type": "code",
+    }
+
+def build_token_data(oauth_config, redirect_uri, scopes, auth_code):
+    return {
+        "client_id": oauth_config["client_id"],
+        "client_secret": oauth_config["client_secret"],
+        "code": auth_code,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+
+credentials = run_oauth_flow(
+    service_name="myservice",
+    user_id="user123",
+    scopes=["read", "write"],
+    auth_url_base="https://auth.example.com/oauth/authorize",
+    token_url="https://auth.example.com/oauth/token",
+    auth_params_builder=build_auth_params,
+    token_data_builder=build_token_data,
+)
+```
+
+### Token Refresh
+
+```python
+from src.utils.oauth.util import refresh_token_if_needed
+
+def build_refresh_data(oauth_config, refresh_token, credentials_data):
+    return {
+        "client_id": oauth_config["client_id"],
+        "client_secret": oauth_config["client_secret"],
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token",
+    }
+
+access_token = await refresh_token_if_needed(
+    user_id="user123",
+    service_name="myservice",
+    token_url="https://auth.example.com/oauth/token",
+    token_data_builder=build_refresh_data,
+)
+```
+
+### PKCE Flow
+
+```python
+from src.utils.oauth.util import (
+    generate_code_verifier,
+    generate_code_challenge,
+    run_oauth_flow
+)
+import json
+
+def build_auth_params_with_pkce(oauth_config, redirect_uri, scopes):
+    code_verifier = generate_code_verifier()
+    code_challenge = generate_code_challenge(code_verifier)
+    
+    # Store code_verifier in state
+    state = json.dumps({"code_verifier": code_verifier})
+    
+    return {
+        "client_id": oauth_config["client_id"],
+        "redirect_uri": redirect_uri,
+        "scope": " ".join(scopes),
+        "response_type": "code",
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+        "state": state,
+    }
+
+def build_token_data_with_pkce(oauth_config, redirect_uri, scopes, auth_code):
+    return {
+        "client_id": oauth_config["client_id"],
+        "client_secret": oauth_config["client_secret"],
+        "code": auth_code,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+        "code_verifier": oauth_config.get("code_verifier"),
+    }
+
+credentials = run_oauth_flow(
+    service_name="myservice",
+    user_id="user123",
+    scopes=["read", "write"],
+    auth_url_base="https://auth.example.com/oauth/authorize",
+    token_url="https://auth.example.com/oauth/token",
+    auth_params_builder=build_auth_params_with_pkce,
+    token_data_builder=build_token_data_with_pkce,
+)
+```
+
+## Error Handling
+
+```python
+from src.utils.oauth.util import run_oauth_flow
+
+try:
+    credentials = run_oauth_flow(
+        # ... parameters
+    )
+except ValueError as e:
+    if "timed out" in str(e):
+        print("User didn't complete authentication in time")
+    elif "failed" in str(e):
+        print(f"Authentication error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## See Also
+
+- [Service Helper Utilities](/api/utils/service-helpers) - Service-specific OAuth implementations
+- [BaseAuthClient](/api/auth/base-client) - Authentication client interface
+- [create_auth_client()](/api/auth/factory) - Auth client factory

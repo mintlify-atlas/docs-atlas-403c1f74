@@ -1,0 +1,134 @@
+---
+title: 'Server Overview'
+description: 'Complete reference for all available guMCP servers'
+---
+
+guMCP provides a comprehensive collection of pre-built MCP servers that connect to popular SaaS platforms and services. Each server implements the Model Context Protocol to expose tools, resources, and capabilities for AI agents.
+
+## Available Servers
+
+### Google Workspace
+
+<CardGroup cols={2}>
+  <Card title="Google Sheets" icon="table" href="/servers/google/gsheets">
+    Read, write, and update Google Sheets spreadsheets
+  </Card>
+  <Card title="Gmail" icon="envelope" href="/servers/google/gmail">
+    Search, read, and send emails through Gmail
+  </Card>
+  <Card title="Google Docs" icon="file-lines" href="/servers/google/gdocs">
+    Create and manage Google Docs documents
+  </Card>
+  <Card title="Google Drive" icon="folder" href="/servers/google/gdrive">
+    Search and access files in Google Drive
+  </Card>
+  <Card title="Google Calendar" icon="calendar" href="/servers/google/gcalendar">
+    Manage events and schedules in Google Calendar
+  </Card>
+</CardGroup>
+
+### Communication
+
+<CardGroup cols={2}>
+  <Card title="Slack" icon="slack" href="/servers/communication/slack">
+    Interact with Slack channels and messages
+  </Card>
+  <Card title="Outlook" icon="microsoft" href="/servers/communication/outlook">
+    Read and send emails through Microsoft Outlook
+  </Card>
+</CardGroup>
+
+### Productivity & CRM
+
+<CardGroup cols={2}>
+  <Card title="Airtable" icon="database" href="/servers/productivity/airtable">
+    Interact with Airtable bases and records
+  </Card>
+  <Card title="Linear" icon="diagram-project" href="/servers/productivity/linear">
+    Manage issues and projects in Linear
+  </Card>
+  <Card title="Attio" icon="address-book" href="/servers/productivity/attio">
+    Manage CRM data in Attio
+  </Card>
+  <Card title="HubSpot" icon="hubspot" href="/servers/productivity/hubspot">
+    Interact with HubSpot CRM
+  </Card>
+  <Card title="Typeform" icon="clipboard-question" href="/servers/productivity/typeform">
+    Retrieve Typeform forms and responses
+  </Card>
+  <Card title="QuickBooks" icon="calculator" href="/servers/productivity/quickbooks">
+    Access QuickBooks accounting data
+  </Card>
+</CardGroup>
+
+### AI & Search
+
+<CardGroup cols={2}>
+  <Card title="Perplexity" icon="magnifying-glass" href="/servers/ai/perplexity">
+    Search the web with Perplexity AI
+  </Card>
+</CardGroup>
+
+### Testing
+
+<CardGroup cols={2}>
+  <Card title="Simple Tools" icon="wrench" href="/servers/testing/simple-tools">
+    Basic test server with simple data storage tools
+  </Card>
+</CardGroup>
+
+## Authentication
+
+Most guMCP servers use OAuth 2.0 authentication. Each server requires:
+
+1. **OAuth Configuration**: Create an OAuth app in the target platform
+2. **Credentials**: Store OAuth credentials in `local_auth/oauth_configs/{server}/oauth.json`
+3. **Authentication Flow**: Run the auth command to obtain access tokens
+
+```bash
+python src/servers/{server}/main.py auth
+```
+
+## Running Servers
+
+### Local Development
+
+Run a server locally:
+
+```bash
+python src/servers/local.py --server {server_name} --user-id local
+```
+
+### Remote/Production
+
+Servers can be deployed and accessed via HTTP endpoints:
+
+```
+https://mcp.gumloop.com/{server}/{user_id}%3A{api_key}
+```
+
+## Common Patterns
+
+### Tools
+
+All servers expose tools that AI agents can call:
+
+- **Read operations**: Search, list, get data
+- **Write operations**: Create, update records
+- **Analysis**: Generate insights, analyze data
+
+### Resources
+
+Servers provide resources that can be read:
+
+- **Collections**: Lists of items (emails, contacts, etc.)
+- **Individual items**: Specific documents, records
+- **Formatted content**: Plain text, JSON, markdown
+
+### Error Handling
+
+All servers implement consistent error handling:
+
+- Authentication errors return clear messages
+- API errors are logged and returned to the client
+- Rate limiting is handled with exponential backoff (where applicable)

@@ -1,0 +1,247 @@
+---
+title: QuickBooks
+description: Interact with QuickBooks Online for accounting and financial management
+---
+
+The QuickBooks server provides comprehensive access to QuickBooks Online data, enabling financial analysis, customer management, and transaction monitoring.
+
+## Authentication
+
+This server uses OAuth 2.0 authentication with QuickBooks Online.
+
+### Prerequisites
+
+- QuickBooks Online Developer account ([sign up here](https://developer.intuit.com/))
+- A registered application with scopes:
+  - `com.intuit.quickbooks.accounting`
+  - `com.intuit.quickbooks.payment`
+
+### Local Setup
+
+1. Create your app and configure a redirect URI (e.g., `http://localhost:8080`)
+2. Get your client ID and client secret
+3. Create `local_auth/oauth_configs/quickbooks/oauth.json`:
+
+```json
+{
+  "client_id": "xxxxxxxxxxxxxxxxxxxxx",
+  "client_secret": "xxxxxxxxxxxxxxxxxxxxx",
+  "redirect_uri": "http://localhost:8080",
+  "quickbooks_environment": "sandbox"
+}
+```
+
+4. Run authentication:
+
+```bash
+python src/servers/quickbooks/main.py auth
+```
+
+Credentials are stored at `~/.config/gumcp/quickbooks/{user_id}.json`.
+
+## Resources
+
+The server exposes these QuickBooks resources:
+
+| URI | Description |
+|-----|-------------|
+| `quickbooks://customers` | All customers |
+| `quickbooks://invoices` | All invoices |
+| `quickbooks://accounts` | Chart of accounts |
+| `quickbooks://items` | Items/products |
+| `quickbooks://bills` | All bills |
+| `quickbooks://payments` | All payments |
+
+## Tools
+
+### Customer Management
+
+<Accordion title="search_customers">
+Search for customers by name, email, or phone.
+
+**Parameters:**
+- `query` (string, required): Search query for customer name, email, or phone
+- `limit` (integer, optional): Maximum number of results (default: 10)
+
+**Example:**
+```json
+{
+  "query": "acme",
+  "limit": 20
+}
+```
+
+**Implementation:** Searches across customer name, email, and phone fields in QuickBooks.
+</Accordion>
+
+### Financial Analysis
+
+<Accordion title="generate_financial_metrics">
+Generate key financial metrics and ratios for a date range.
+
+**Parameters:**
+- `start_date` (string, required): Start date (YYYY-MM-DD)
+- `end_date` (string, required): End date (YYYY-MM-DD)
+- `metrics` (array, optional): List of metrics to calculate
+
+**Available Metrics:**
+- `current_ratio` - Current assets / current liabilities
+- `quick_ratio` - (Current assets - inventory) / current liabilities
+- `debt_to_equity` - Total debt / total equity
+- `gross_margin` - (Revenue - COGS) / Revenue
+- `operating_margin` - Operating income / Revenue
+- `net_margin` - Net income / Revenue
+
+**Default Metrics:** current_ratio, gross_margin, net_margin
+
+**Example:**
+```json
+{
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
+  "metrics": ["current_ratio", "debt_to_equity", "net_margin"]
+}
+```
+</Accordion>
+
+<Accordion title="analyze_cash_flow">
+Analyze cash flow trends and patterns over a date range.
+
+**Parameters:**
+- `start_date` (string, required): Start date (YYYY-MM-DD)
+- `end_date` (string, required): End date (YYYY-MM-DD)
+- `group_by` (string, optional): Group results by 'month' or 'quarter' (default: month)
+
+**Example:**
+```json
+{
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
+  "group_by": "quarter"
+}
+```
+
+**Analysis Includes:**
+- Cash inflows by period
+- Cash outflows by period
+- Net cash flow
+- Trend analysis
+</Accordion>
+
+<Accordion title="analyze_customer_payment_patterns">
+Analyze customer payment behavior and patterns.
+
+**Parameters:**
+- `customer_id` (string, required): QuickBooks customer ID
+- `months` (integer, optional): Number of months to analyze (default: 12)
+
+**Example:**
+```json
+{
+  "customer_id": "123",
+  "months": 6
+}
+```
+
+**Analysis Includes:**
+- Average days to payment
+- Payment consistency
+- Outstanding balance trends
+- Late payment patterns
+</Accordion>
+
+### Transaction Management
+
+<Accordion title="find_duplicate_transactions">
+Identify potential duplicate transactions.
+
+**Parameters:**
+- `start_date` (string, required): Start date (YYYY-MM-DD)
+- `end_date` (string, required): End date (YYYY-MM-DD)
+- `amount_threshold` (number, optional): Minimum amount to consider (default: 100)
+
+**Example:**
+```json
+{
+  "start_date": "2024-01-01",
+  "end_date": "2024-03-31",
+  "amount_threshold": 50
+}
+```
+
+**Detection Criteria:**
+- Same amount
+- Same date (or within 1 day)
+- Same vendor/customer
+- Similar descriptions
+</Accordion>
+
+### Tax & Compliance
+
+<Accordion title="analyze_sred">
+Analyze expenses for potential SR&ED (Scientific Research and Experimental Development) eligibility.
+
+**Parameters:**
+- `start_date` (string, required): Start date (YYYY-MM-DD)
+- `end_date` (string, required): End date (YYYY-MM-DD)
+- `keywords` (array, optional): Additional keywords to search for
+
+**Default Keywords:**
+- research
+- development
+- experiment
+- testing
+- prototype
+- engineering
+
+**Example:**
+```json
+{
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
+  "keywords": ["research", "development", "R&D", "innovation"]
+}
+```
+
+**Note:** This tool is specifically designed for Canadian SR&ED tax credit analysis.
+</Accordion>
+
+## API Reference
+
+The server uses the [python-quickbooks](https://github.com/ej2/python-quickbooks) library to interact with QuickBooks Online API.
+
+### Authentication Flow
+
+1. OAuth client created with Intuit credentials
+2. Access token and refresh token managed automatically
+3. Company ID (realm ID) stored with credentials
+
+### Environment Support
+
+- **Sandbox**: For testing (default)
+- **Production**: For live data
+
+Set via `quickbooks_environment` in oauth.json.
+
+## Resource Formatting
+
+Resources are formatted with helper functions:
+
+- **Customers**: ID, name, email, phone, balance
+- **Invoices**: ID, customer, date, amount, balance
+- **Accounts**: ID, name, type, balance
+- **Items**: ID, name, type, price
+- **Bills**: ID, vendor, date, due date, amount, balance
+- **Payments**: ID, customer, date, amount
+
+## Error Handling
+
+Comprehensive error handling for:
+- Authentication failures
+- Invalid QuickBooks credentials
+- Missing permissions
+- API rate limits
+- Invalid resource URIs
+- Network errors
+
+All errors are logged and returned with descriptive messages.

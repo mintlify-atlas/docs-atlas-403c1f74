@@ -1,0 +1,203 @@
+---
+title: Installation
+description: Install guMCP and set up your development environment
+---
+
+This guide will walk you through installing guMCP and setting up your development environment.
+
+## Video Tutorial
+
+Before getting started, we recommend watching our quick setup video (under 5 minutes):
+
+<Frame>
+  <iframe
+    width="100%"
+    height="400"
+    src="https://player.vimeo.com/video/1070438737?h=8dea56e6a1"
+    frameBorder="0"
+    allow="autoplay; fullscreen; picture-in-picture"
+    allowFullScreen
+  />
+</Frame>
+
+## Prerequisites
+
+Before installing guMCP, ensure you have the following:
+
+- **Python 3.11** - guMCP requires Python 3.11 or higher
+- **Git** - For cloning the repository
+- **Bash-compatible shell** (Windows users) - Git Bash, WSL, or similar
+
+<Tip>
+You can verify your Python version by running `python --version` or `python3 --version` in your terminal.
+</Tip>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the guMCP repository from GitHub:
+
+    <CodeGroup>
+    ```bash HTTPS
+    git clone https://github.com/gumloop/guMCP.git
+    cd guMCP
+    ```
+
+    ```bash SSH
+    git clone git@github.com:gumloop/guMCP.git
+    cd guMCP
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create a virtual environment">
+    Set up a Python virtual environment to isolate project dependencies from your system Python installation:
+
+    ```bash
+    python -m venv venv
+    ```
+
+    <Note>
+    The virtual environment will be created in a `venv` directory within your project folder.
+    </Note>
+  </Step>
+
+  <Step title="Activate the virtual environment">
+    Activate your virtual environment using the appropriate command for your operating system:
+
+    <CodeGroup>
+    ```bash macOS/Linux
+    source venv/bin/activate
+    ```
+
+    ```bash Windows (Command Prompt)
+    venv\Scripts\activate
+    ```
+
+    ```powershell Windows (PowerShell)
+    .\venv\Scripts\Activate.ps1
+    ```
+
+    ```bash Windows (Git Bash)
+    source venv/Scripts/activate
+    ```
+    </CodeGroup>
+
+    <Tip>
+    You'll know your virtual environment is active when you see `(venv)` at the beginning of your command prompt.
+    </Tip>
+  </Step>
+
+  <Step title="Install dependencies">
+    Install the core dependencies required to run guMCP:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    This will install all necessary packages including:
+    - `mcp` (v1.4.1) - Model Context Protocol SDK
+    - `anthropic` - Anthropic API client
+    - `starlette` & `uvicorn` - Web framework and ASGI server
+    - `google-api-python-client` - Google services integration
+    - `slack-sdk` - Slack integration
+    - And many more dependencies listed in `requirements.txt`
+  </Step>
+
+  <Step title="Install development dependencies (optional)">
+    If you plan to contribute to guMCP or run tests, install the development dependencies:
+
+    ```bash
+    pip install -r requirements-dev.txt
+    ```
+
+    This includes:
+    - `pytest` & `pytest-asyncio` - Testing framework
+    - `black` - Code formatter
+    - `flake8` - Linter
+    - `mypy` - Type checker
+  </Step>
+
+  <Step title="Configure environment variables">
+    Create a local environment file from the template:
+
+    <CodeGroup>
+    ```bash Unix/macOS
+    cp .env.example .env
+    ```
+
+    ```bash Windows (Command Prompt)
+    copy .env.example .env
+    ```
+
+    ```powershell Windows (PowerShell)
+    Copy-Item .env.example .env
+    ```
+    </CodeGroup>
+
+    Then open the `.env` file in your preferred text editor:
+
+    ```bash VS Code
+    code .env
+    ```
+
+    See the [Configuration](/configuration) guide for details on all available environment variables.
+  </Step>
+</Steps>
+
+## Verify Installation
+
+To verify that guMCP is installed correctly, try starting the SSE development server:
+
+```bash
+./start_sse_dev_server.sh
+```
+
+You should see output indicating the server has started on `http://0.0.0.0:8000`.
+
+<Tip>
+Press `Ctrl+C` to stop the server.
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Python version mismatch">
+    If you have multiple Python versions installed, you may need to use `python3.11` explicitly:
+
+    ```bash
+    python3.11 -m venv venv
+    ```
+  </Accordion>
+
+  <Accordion title="Permission errors on Unix/macOS">
+    If you encounter permission errors when running `start_sse_dev_server.sh`, make the script executable:
+
+    ```bash
+    chmod +x start_sse_dev_server.sh
+    ```
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    If port 8000 is already in use, the startup script will automatically kill any process using it. You can also manually specify a different port (see [Configuration](/configuration)).
+  </Accordion>
+
+  <Accordion title="Module import errors">
+    If you see module import errors, ensure:
+    1. Your virtual environment is activated (you should see `(venv)` in your prompt)
+    2. All dependencies are installed: `pip install -r requirements.txt`
+    3. You're running commands from the project root directory
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with your first MCP server
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure environment variables and server settings
+  </Card>
+</CardGroup>

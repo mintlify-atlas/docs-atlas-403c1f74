@@ -1,0 +1,431 @@
+---
+title: Code Style Standards
+description: Code quality standards and tooling for guMCP development
+---
+
+This guide covers the code style standards, linting tools, and formatting requirements for guMCP development.
+
+## Code Style Standards
+
+guMCP follows these coding standards:
+
+<CardGroup cols={3}>
+  <Card title="PEP 8" icon="python">
+    Python code style guide for consistency
+  </Card>
+  <Card title="Type Hints" icon="brackets-curly">
+    Type hints for all functions and methods
+  </Card>
+  <Card title="Docstrings" icon="file-lines">
+    Documentation for all public APIs
+  </Card>
+</CardGroup>
+
+## Code Quality Tools
+
+guMCP uses three main tools to enforce code quality:
+
+### Black - Code Formatting
+
+Black is an opinionated code formatter that ensures consistent style:
+
+```bash
+# Format all code
+python scripts/format.py
+
+# Format specific files
+black src/servers/your-server/main.py
+```
+
+**Configuration**: Black uses default settings (88 character line length)
+
+### Flake8 - Linting
+
+Flake8 checks for Python code errors and style violations:
+
+```bash
+# Run linting (includes flake8)
+python scripts/lint.py
+
+# Run flake8 directly
+flake8 src/servers/your-server/
+```
+
+**Common Issues Caught**:
+- Unused imports
+- Undefined variables
+- Line too long
+- Missing whitespace
+- Trailing whitespace
+
+### MyPy - Type Checking
+
+MyPy performs static type checking:
+
+```bash
+# Run linting (includes mypy)
+python scripts/lint.py
+
+# Run mypy directly
+mypy --explicit-package-bases src/servers/your-server/
+```
+
+**Type Checking Example**:
+
+```python
+# Good: Type hints provided
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    pass
+
+# Bad: No type hints
+async def handle_call_tool(name, arguments):
+    pass
+```
+
+## Development Requirements
+
+From `requirements-dev.txt`:
+
+```txt
+# Linting and formatting
+flake8>=6.0.0
+mypy>=1.5.0
+black>=23.7.0
+pydantic[mypy]
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.1
+pytest-timeout
+pytest-mock==3.11.1
+```
+
+Install development dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+## Formatting Script
+
+The format script (`scripts/format.py`) automatically formats Python code:
+
+```python
+# Formats these directories
+FORMAT_DIRS = [
+    ROOT_DIR / "src",
+    ROOT_DIR / "tests",
+]
+```
+
+**Usage**:
+
+```bash
+# Format all code
+python scripts/format.py
+
+# Check what would be formatted (dry run)
+black --check src/ tests/
+```
+
+**Features**:
+- Respects `.gitignore` patterns
+- Recursively formats all Python files
+- Provides detailed output
+- Returns non-zero exit code on errors
+
+## Linting Script
+
+The lint script (`scripts/lint.py`) runs all quality checks:
+
+```bash
+# Run all checks
+python scripts/lint.py
+
+# Auto-fix formatting issues
+python scripts/lint.py --fix
+
+# Check specific directories
+python scripts/lint.py --dirs src/servers/your-server
+```
+
+**What It Checks**:
+1. **Flake8** - Code linting
+2. **MyPy** - Type checking
+3. **Black** - Format verification
+
+**Output Example**:
+
+```bash
+2024-01-15 10:30:00 - gumcp-lint - INFO - Parsed 25 patterns from .gitignore
+2024-01-15 10:30:00 - gumcp-lint - INFO - Found 145 Python files to check
+2024-01-15 10:30:01 - gumcp-lint - INFO - Flake8 linting...
+2024-01-15 10:30:03 - gumcp-lint - INFO - ✅ Flake8 linting passed!
+2024-01-15 10:30:03 - gumcp-lint - INFO - Mypy type checking...
+2024-01-15 10:30:05 - gumcp-lint - INFO - ✅ Mypy type checking passed!
+2024-01-15 10:30:05 - gumcp-lint - INFO - Black format checking...
+2024-01-15 10:30:06 - gumcp-lint - INFO - ✅ Black format checking passed!
+2024-01-15 10:30:06 - gumcp-lint - INFO - ✅ All linting checks passed!
+```
+
+## Code Style Examples
+
+### Logging
+
+```python
+import logging
+
+# Configure at module level
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("your-server-name")
+
+# Use throughout code
+logger.info(f"Processing request for user: {user_id}")
+logger.error(f"Failed to retrieve data: {error}")
+```
+
+### Type Hints
+
+```python
+from typing import Dict, List, Any
+import mcp.types as types
+
+# Function type hints
+async def get_credentials(user_id: str, api_key: str = None) -> str:
+    """Get credentials for user"""
+    pass
+
+# Complex return types
+async def handle_call_tool(
+    name: str,
+    arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Handle tool execution"""
+    pass
+
+# Dictionary type hints
+def process_config(config: Dict[str, Any]) -> List[str]:
+    """Process configuration dictionary"""
+    pass
+```
+
+### Docstrings
+
+```python
+def create_server(user_id=None, api_key=None):
+    """Create a new server instance with optional user context
+
+    Args:
+        user_id: Optional user identifier for multi-tenant scenarios
+        api_key: Optional API key for authentication
+
+    Returns:
+        Server instance configured with the specified parameters
+    """
+    pass
+
+@server.list_tools()
+async def handle_list_tools() -> list[types.Tool]:
+    """List available tools.
+
+    Each tool specifies its arguments using JSON Schema validation.
+
+    Returns:
+        List of Tool objects describing available tools
+    """
+    pass
+```
+
+### Error Handling
+
+```python
+# Good: Specific exception types with messages
+try:
+    result = await api_call()
+except httpx.HTTPError as e:
+    logger.error(f"HTTP error during API call: {str(e)}")
+    return [types.TextContent(
+        type="text",
+        text=f"Error: API request failed - {str(e)}"
+    )]
+except ValueError as e:
+    logger.error(f"Invalid value: {str(e)}")
+    raise
+
+# Good: Validation with clear errors
+if not arguments:
+    raise ValueError("Missing arguments")
+
+if not arguments.get("key"):
+    raise ValueError("Missing required parameter: key")
+```
+
+### Import Organization
+
+```python
+# Standard library imports
+import os
+import sys
+import logging
+from pathlib import Path
+from typing import Dict, List, Any
+
+# Third-party imports
+import httpx
+import mcp.types as types
+from mcp.server import NotificationOptions, Server
+from mcp.server.models import InitializationOptions
+
+# Local imports
+from src.auth.factory import create_auth_client
+from src.utils.oauth.util import run_oauth_flow
+```
+
+## Pre-Commit Workflow
+
+Before committing code:
+
+<Steps>
+  <Step title="Format your code">
+    ```bash
+    python scripts/format.py
+    ```
+  </Step>
+
+  <Step title="Run linting checks">
+    ```bash
+    python scripts/lint.py
+    ```
+  </Step>
+
+  <Step title="Fix any issues">
+    Address any errors or warnings reported by the linters
+  </Step>
+
+  <Step title="Run tests">
+    ```bash
+    python tests/servers/test_runner.py --server=your-server
+    ```
+  </Step>
+</Steps>
+
+## Common Style Issues
+
+<AccordionGroup>
+  <Accordion title="Line Length">
+    **Problem**: Lines longer than 88 characters
+
+    **Solution**: Break into multiple lines
+    ```python
+    # Good
+    result = some_function(
+        first_argument,
+        second_argument,
+        third_argument
+    )
+
+    # Bad
+    result = some_function(first_argument, second_argument, third_argument, fourth_argument)
+    ```
+  </Accordion>
+
+  <Accordion title="Missing Type Hints">
+    **Problem**: Functions without type annotations
+
+    **Solution**: Add type hints to all functions
+    ```python
+    # Good
+    def process_data(data: dict) -> list[str]:
+        pass
+
+    # Bad
+    def process_data(data):
+        pass
+    ```
+  </Accordion>
+
+  <Accordion title="Unused Imports">
+    **Problem**: Importing modules that aren't used
+
+    **Solution**: Remove or comment why they're needed
+    ```python
+    # Good
+    import logging  # Used for logger
+    logger = logging.getLogger(__name__)
+
+    # Bad
+    import logging
+    import sys  # Not used anywhere
+    ```
+  </Accordion>
+
+  <Accordion title="Missing Docstrings">
+    **Problem**: Public functions without documentation
+
+    **Solution**: Add docstrings to all public APIs
+    ```python
+    # Good
+    def authenticate_user(user_id: str) -> bool:
+        """Authenticate a user by ID
+
+        Args:
+            user_id: The user identifier
+
+        Returns:
+            True if authentication succeeds
+        """
+        pass
+
+    # Bad
+    def authenticate_user(user_id: str) -> bool:
+        pass
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## IDE Configuration
+
+### VS Code
+
+Add to `.vscode/settings.json`:
+
+```json
+{
+  "python.formatting.provider": "black",
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.linting.mypyEnabled": true,
+  "editor.formatOnSave": true
+}
+```
+
+### PyCharm
+
+1. Install Black plugin
+2. Enable "Black" as formatter in Settings > Tools > Black
+3. Enable "Flake8" in Settings > Tools > Python Integrated Tools
+4. Enable "Mypy" in Settings > Tools > Python Integrated Tools
+
+## CI/CD Integration
+
+Quality checks should be part of your CI/CD pipeline:
+
+```yaml
+# Example GitHub Actions workflow
+- name: Check code formatting
+  run: python scripts/lint.py
+
+- name: Run tests
+  run: python tests/servers/test_runner.py --server=your-server
+```
+
+## Next Steps
+
+- Read [Testing Guide](/development/testing) for testing standards
+- Review [Creating Servers](/development/creating-servers) for implementation patterns
+- See [Contributing Guidelines](/development/contributing) for PR requirements
